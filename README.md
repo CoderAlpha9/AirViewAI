@@ -178,6 +178,23 @@ available values and never backfill missing sources with generated observations.
 ## License
 
 [MIT](LICENSE)
+
+## Local replay demo
+
+AirView AI is a five-city historical-replay pilot for Agra, Amritsar, Delhi NCR,
+Lucknow and Ludhiana. It does not provide current operational forecasts or health advice.
+
+```powershell
+.\scripts\run_demo.ps1 -NoBrowser
+.\scripts\verify_demo.ps1
+.\scripts\stop_demo.ps1
+```
+
+The main product views are `/command-centre`, `/citizen-advisory`,
+`/india-coverage`, and `/agent-audit`. Curated replay presets, persistent
+orchestration records, JSON exports, and self-contained print-friendly HTML exports are
+available through the command centre and audit views. Supported public-information
+advisory languages are English, Hindi, and Punjabi.
 # AirView AI
 
 AirView AI includes historical forecasting and a transparent station-centred intelligence screening layer. Run `python -m airview_ml.intelligence.pipeline all --profile hackathon --resume` from `ml` to regenerate intelligence reports. These outputs are decision support, not regulatory source apportionment or causal intervention measurement.

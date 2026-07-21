@@ -12,6 +12,10 @@ export function AppLayout() {
             <span className="text-sm font-semibold tracking-[0.16em]">AIRVIEW AI</span>
           </Link>
           <nav className="flex items-center gap-5 text-xs font-medium uppercase tracking-[0.14em] text-mist">
+            <Link className="transition hover:text-air" to="/command-centre">Command centre</Link>
+            <Link className="transition hover:text-air" to="/india-coverage">India coverage</Link>
+            <Link className="transition hover:text-air" to="/citizen-advisory">Citizen advisories</Link>
+            <Link className="transition hover:text-air" to="/agent-audit">Agent audit</Link>
             <Link className="transition hover:text-air" to="/data-readiness">Data readiness</Link>
             <Link className="transition hover:text-air" to="/forecast-evaluation">Forecast evaluation</Link>
             <Link className="transition hover:text-air" to="/source-intelligence">Source intelligence</Link>
