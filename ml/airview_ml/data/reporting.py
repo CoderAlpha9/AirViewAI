@@ -16,6 +16,10 @@ REPORT_NAMES = {
     "aliases": "city_alias_review.json",
     "failures": "source_failures.json",
     "manual": "manual_actions_required.json",
+    "openaq_archive_manifest": "openaq_archive_manifest.json",
+    "openaq_location_mapping_report": "openaq_location_mapping_report.json",
+    "unresolved_openaq_locations": "unresolved_openaq_locations.json",
+    "ambiguous_station_matches": "ambiguous_station_matches.json",
 }
 
 

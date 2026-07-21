@@ -6,6 +6,7 @@ POLLUTANT_ALIASES = {
     "pm2.5": "pm2_5",
     "pm 2.5": "pm2_5",
     "pm25": "pm2_5",
+    "pm2_5": "pm2_5",
     "pm10": "pm10",
     "no2": "no2",
     "nitrogen dioxide": "no2",

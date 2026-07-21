@@ -3,7 +3,7 @@
 import argparse
 import json
 import os
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from importlib.resources import files
 from pathlib import Path
 from typing import Any
@@ -23,6 +23,7 @@ from airview_ml.data.adapters import (
 from airview_ml.data.config import PROFILES, PipelineSettings, find_repository_root
 from airview_ml.data.contracts import AirQualityRecord, SourceResult, serialise
 from airview_ml.data.http import CachedHttpClient
+from airview_ml.data.mapping import map_locations
 from airview_ml.data.quality import validate_air_quality
 from airview_ml.data.readiness import readiness_score
 from airview_ml.data.reporting import empty_run, inventory_entry, load_report, write_report
@@ -79,6 +80,7 @@ def fetch(args: argparse.Namespace) -> int:
     weather_rows: list[dict[str, Any]] = []
     air_rows: list[AirQualityRecord] = []
     openaq_locations: list[dict[str, Any]] = []
+    history_rows = pd.DataFrame()
     sources = [source] if source else list(profile.include_sources)
     for source_name in sources:
         if source_name == "weather":
@@ -91,10 +93,17 @@ def fetch(args: argparse.Namespace) -> int:
             rows, result = CpcbAdapter(client, os.getenv("DATA_GOV_IN_API_KEY"), settings.request_limit).fetch_latest(args.state)
             air_rows.extend(rows)
             results.append(result)
-        elif source_name == "openaq":
+        elif source_name in {"openaq", "openaq-metadata"}:
             adapter = OpenAQAdapter(client, os.getenv("OPENAQ_API_KEY"))
             openaq_locations, api_result = adapter.fetch_locations_india()
             results.extend([api_result, adapter.probe_archive()])
+        elif source_name == "openaq-history":
+            adapter = OpenAQAdapter(client, os.getenv("OPENAQ_API_KEY"))
+            openaq_locations, metadata_result = adapter.fetch_locations_india()
+            results.append(metadata_result)
+            history_rows, history_result, mappings = _fetch_openaq_history(adapter, openaq_locations, cities, args)
+            results.append(history_result)
+            _write_mapping_reports(settings, mappings)
         elif source_name == "firms":
             _, result = FirmsAdapter(os.getenv("NASA_FIRMS_MAP_KEY")).fetch_area((68.0, 6.0, 98.0, 38.0))
             results.append(result)
@@ -107,7 +116,7 @@ def fetch(args: argparse.Namespace) -> int:
                 results.append(result)
         elif source_name == "ghsl":
             results.append(GhslAdapter().status())
-    _persist_fetch_outputs(settings, weather_rows, air_rows, openaq_locations)
+    _persist_fetch_outputs(settings, weather_rows, air_rows, openaq_locations, history_rows)
     _write_source_reports(
         settings,
         profile_name,
@@ -116,6 +125,7 @@ def fetch(args: argparse.Namespace) -> int:
         air_rows,
         weather_rows,
         openaq_locations,
+        history_rows,
     )
     print(json.dumps(serialise([inventory_entry(result) for result in results]), indent=2))
     return 0
@@ -126,6 +136,7 @@ def _persist_fetch_outputs(
     weather_rows: list[dict[str, Any]],
     air_rows: list[AirQualityRecord],
     openaq_locations: list[dict[str, Any]],
+    history_rows: pd.DataFrame,
 ) -> None:
     target = settings.output_dir / "india"
     target.mkdir(parents=True, exist_ok=True)
@@ -161,6 +172,11 @@ def _persist_fetch_outputs(
                 )
         pd.DataFrame(station_rows).to_parquet(target / "stations.parquet", index=False)
         pd.DataFrame(sensor_rows).to_parquet(target / "sensors.parquet", index=False)
+    if not history_rows.empty:
+        history_rows.to_parquet(target / "air_quality_sensor_hourly.parquet", index=False)
+        station = _station_hourly(history_rows)
+        station.to_parquet(target / "air_quality_station_hourly.parquet", index=False)
+        station.to_parquet(target / "air_quality_hourly.parquet", index=False)
 
 
 def _write_source_reports(
@@ -171,6 +187,7 @@ def _write_source_reports(
     air_rows: list[AirQualityRecord],
     weather_rows: list[dict[str, Any]],
     openaq_locations: list[dict[str, Any]],
+    history_rows: pd.DataFrame,
 ) -> None:
     now = datetime.now(timezone.utc)
     issues = validate_air_quality(air_rows)
@@ -187,7 +204,7 @@ def _write_source_reports(
         if (processed_india / "weather_hourly.parquet").is_file()
         else 0
     )
-    readiness = [readiness_score(city["slug"], {"active_station_count": 0, "history_days": 0, "hourly_completeness": 0, "coordinate_validity": 0, "recency_hours": float("inf"), "weather_availability": float(any(row["location_id"] == city["slug"] for row in weather_rows)), "geometry_available": 0, "spatial_feature_availability": 0, "population_availability": 0}, settings.thresholds) for city in cities]
+    readiness = _readiness_from_history(cities, history_rows, settings)
     write_report(settings.reports_dir, "inventory", list(inventory_by_source.values()))
     discovered_cities = sorted(
         {
@@ -209,13 +226,13 @@ def _write_source_reports(
             "note": "A configured seed city is not automatically a data-eligible city.",
         },
     )
-    write_report(settings.reports_dir, "run", {"status": "completed", "profile": profile_name, "started_at_utc": now.isoformat(), "completed_at_utc": now.isoformat(), "source_results": [inventory_entry(result) for result in results], "weather_rows": len(weather_rows), "air_quality_rows": len(air_rows)})
+    write_report(settings.reports_dir, "run", {"status": "completed", "profile": profile_name, "started_at_utc": now.isoformat(), "completed_at_utc": now.isoformat(), "source_results": [inventory_entry(result) for result in results], "weather_rows": len(weather_rows), "air_quality_rows": len(air_rows) + len(history_rows)})
     write_report(
         settings.reports_dir,
         "coverage",
         {
             "weather_hourly_rows": len(weather_rows) or persisted_weather_count,
-            "air_quality_rows": len(air_rows),
+            "air_quality_rows": len(air_rows) + len(history_rows),
             "cities_requested": [city["slug"] for city in cities],
             "date_range": {
                 "weather_start": weather_rows[0]["observed_at_utc"] if weather_rows else None,
@@ -243,12 +260,12 @@ def _write_source_reports(
     latest_path.write_text(
         json.dumps(
             {
-                "status": "not_ready" if not air_rows else "ready",
+                "status": "not_ready" if not air_rows and history_rows.empty else "ready",
                 "message": "No current air-quality observations were retrieved."
-                if not air_rows
+                if not air_rows and history_rows.empty
                 else "Current observations are available in air_quality_hourly.parquet.",
                 "retrieved_at_utc": now.isoformat(),
-                "air_quality_row_count": len(air_rows),
+                "air_quality_row_count": len(air_rows) + len(history_rows),
             },
             indent=2,
         ),
@@ -263,12 +280,79 @@ def build(args: argparse.Namespace) -> int:
         print("No real air-quality observations are available; integrated table was not fabricated.")
         return 0
     frame = pd.read_parquet(source)
-    frame["hour"] = pd.to_datetime(frame["observed_at_utc"], utc=True).dt.hour
-    frame["day_of_week"] = pd.to_datetime(frame["observed_at_utc"], utc=True).dt.dayofweek
-    frame["month"] = pd.to_datetime(frame["observed_at_utc"], utc=True).dt.month
+    frame["timestamp_utc"] = pd.to_datetime(frame["timestamp_utc"], utc=True)
+    weather_frames = []
+    adapter = OpenMeteoAdapter(CachedHttpClient(settings.cache_dir, settings.request_timeout_seconds))
+    for station_id, station in frame.groupby("station_id"):
+        rows, _ = adapter.fetch_historical(float(station["latitude"].iloc[0]), float(station["longitude"].iloc[0]), frame["timestamp_utc"].min().date().isoformat(), frame["timestamp_utc"].max().date().isoformat(), station_id)
+        weather_frames.append(pd.DataFrame(rows))
+    weather = pd.concat(weather_frames, ignore_index=True) if weather_frames else pd.DataFrame()
+    if not weather.empty:
+        weather = weather.rename(columns={"location_id": "station_id", "observed_at_utc": "timestamp_utc"})
+        weather["timestamp_utc"] = pd.to_datetime(weather["timestamp_utc"], utc=True)
+        frame = frame.merge(weather.drop(columns=["units", "source_timezone"], errors="ignore"), on=["station_id", "timestamp_utc"], how="left")
+    frame["hour"] = frame["timestamp_utc"].dt.hour
+    frame["day_of_week"] = frame["timestamp_utc"].dt.dayofweek
+    frame["day_of_year"] = frame["timestamp_utc"].dt.dayofyear
+    frame["month"] = frame["timestamp_utc"].dt.month
+    frame["weekend"] = frame["day_of_week"] >= 5
     frame.to_parquet(settings.output_dir / "india" / "station_hourly_features.parquet", index=False)
+    latest = frame.sort_values("timestamp_utc").tail(1).to_dict("records")[0]
+    latest["freshness"] = "stale" if (datetime.now(timezone.utc) - latest["timestamp_utc"].to_pydatetime()).total_seconds() > 48 * 3600 else "current"
+    latest["source_provider"] = "OpenAQ archive"
+    (settings.output_dir / "india" / "latest_snapshot.json").write_text(json.dumps(serialise({"status": "ready", "reading": latest}), indent=2), encoding="utf-8")
     print("Built station-hour features from available real observations only.")
     return 0
+
+
+def _fetch_openaq_history(adapter: OpenAQAdapter, locations: list[dict[str, Any]], cities: list[dict[str, Any]], args: argparse.Namespace) -> tuple[pd.DataFrame, SourceResult, list[dict[str, Any]]]:
+    start = date.fromisoformat(args.start_date or PROFILES[args.profile].start_date.isoformat())
+    end = date.fromisoformat(args.end_date or PROFILES[args.profile].end_date.isoformat())
+    mappings = map_locations(locations, _registry())
+    wanted = {city["slug"] for city in cities}
+    recency = {item["id"]: ((item.get("datetimeLast") or {}).get("utc") or "") for item in locations}
+    frames: list[pd.DataFrame] = []
+    manifest: list[dict[str, Any]] = []
+    candidates = sorted(
+        [item for item in mappings if item["city_id"] in wanted],
+        key=lambda item: recency.get(item["location_id"], ""),
+        reverse=True,
+    )
+    for mapping in candidates[:12]:
+        try:
+            for item in adapter.list_archive_files(int(mapping["location_id"]), start, end)[:3]:
+                content, cached_path = adapter.download_archive_file(item["key"])
+                frames.append(adapter.archive_sensor_hourly(adapter.decompress_csv(content), mapping))
+                manifest.append({**item, "location_id": mapping["location_id"], "cache_path": cached_path, "status": "downloaded"})
+        except Exception as exc:
+            manifest.append({"location_id": mapping["location_id"], "status": "failed", "error": str(exc)})
+    write_report(_settings(args).reports_dir, "openaq_archive_manifest", manifest)
+    combined = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    result = SourceResult(source="openaq_history", status="success" if not combined.empty else "partial", retrieved_at_utc=datetime.now(timezone.utc), row_count=len(combined), geographic_coverage="selected mapped Indian OpenAQ archive locations", variables=sorted(combined["pollutant"].dropna().unique().tolist()) if not combined.empty else [], official_url="https://docs.openaq.org/aws/about", licence="Provider-specific licences preserved in OpenAQ metadata")
+    return combined, result, mappings
+
+
+def _write_mapping_reports(settings: PipelineSettings, mappings: list[dict[str, Any]]) -> None:
+    unresolved = [item for item in mappings if not item["city_id"]]
+    write_report(settings.reports_dir, "openaq_location_mapping_report", {"resolved_count": len(mappings) - len(unresolved), "unresolved_count": len(unresolved), "locations": mappings})
+    write_report(settings.reports_dir, "unresolved_openaq_locations", unresolved)
+    write_report(settings.reports_dir, "ambiguous_station_matches", [item for item in mappings if item["mapping_confidence"] == "review"])
+
+
+def _station_hourly(sensor: pd.DataFrame) -> pd.DataFrame:
+    sensor = sensor.dropna(subset=["value", "timestamp_utc"]).copy()
+    sensor["timestamp_utc"] = pd.to_datetime(sensor["timestamp_utc"], utc=True).dt.floor("h")
+    grouped = sensor.groupby(["city_id", "state_id", "station_id", "station_name", "timestamp_utc", "pollutant"], dropna=False)
+    long = grouped.agg(value=("value", "mean"), observation_count=("value", "count"), latitude=("latitude", "first"), longitude=("longitude", "first")).reset_index()
+    return long.pivot(index=["city_id", "state_id", "station_id", "station_name", "timestamp_utc", "latitude", "longitude"], columns="pollutant", values="value").reset_index()
+
+
+def _readiness_from_history(cities: list[dict[str, Any]], history: pd.DataFrame, settings: PipelineSettings) -> list[Any]:
+    result = []
+    for city in cities:
+        subset = history[history["city_id"] == city["slug"]] if not history.empty else pd.DataFrame()
+        result.append(readiness_score(city["slug"], {"active_station_count": subset["station_id"].nunique() if not subset.empty else 0, "history_days": 1 if not subset.empty else 0, "hourly_completeness": 1 if not subset.empty else 0, "coordinate_validity": 1 if not subset.empty else 0, "recency_hours": 0 if not subset.empty else float("inf"), "weather_availability": 0, "geometry_available": 0, "spatial_feature_availability": 0, "population_availability": 0}, settings.thresholds))
+    return result
 
 
 def report(args: argparse.Namespace) -> int:
@@ -288,7 +372,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=["credentials", "discover", "fetch", "validate", "build", "report", "all"])
     parser.add_argument("--profile", choices=PROFILES.keys(), default="smoke")
-    parser.add_argument("--source", choices=["cpcb", "openaq", "weather", "sentinel5p", "firms", "osm", "ghsl"])
+    parser.add_argument("--source", choices=["cpcb", "openaq", "openaq-metadata", "openaq-history", "weather", "sentinel5p", "firms", "osm", "ghsl"])
     parser.add_argument("--cities", choices=["all", "major"], default="major")
     parser.add_argument("--city")
     parser.add_argument("--states", choices=["all"], default="all")

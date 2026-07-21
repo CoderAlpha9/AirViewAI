@@ -28,8 +28,8 @@ class PipelineProfile:
 PROFILES: dict[ProfileName, PipelineProfile] = {
     "smoke": PipelineProfile(
         name="smoke",
-        start_date=date(2026, 7, 15),
-        end_date=date(2026, 7, 16),
+        start_date=date(2026, 7, 1),
+        end_date=date(2026, 7, 2),
         cities=("delhi-ncr", "mumbai", "bengaluru"),
         include_sources=("cpcb", "openaq", "weather", "osm", "ghsl", "firms", "sentinel5p"),
         max_workers=2,

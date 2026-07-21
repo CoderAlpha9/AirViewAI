@@ -1,6 +1,7 @@
 import gzip
 import io
-from datetime import datetime, timezone
+import xml.etree.ElementTree as ET
+from datetime import date, datetime, timezone
 from pathlib import PurePosixPath
 from typing import Any
 
@@ -8,6 +9,8 @@ import pandas as pd
 
 from airview_ml.data.contracts import SourceResult
 from airview_ml.data.http import CachedHttpClient
+from airview_ml.data.normalization import normalise_pollutant
+from airview_ml.data.units import convert_pollutant
 
 
 class OpenAQAdapter:
@@ -118,3 +121,47 @@ class OpenAQAdapter:
     def decompress_csv(content: bytes) -> pd.DataFrame:
         with gzip.GzipFile(fileobj=io.BytesIO(content)) as stream:
             return pd.read_csv(stream)
+
+    def list_archive_files(self, location_id: int, start: date, end: date) -> list[dict[str, Any]]:
+        keys: list[dict[str, Any]] = []
+        year, month = start.year, start.month
+        while (year, month) <= (end.year, end.month):
+            prefix = f"records/csv.gz/locationid={location_id}/year={year}/month={month:02d}/"
+            text, _, _ = self.client.get_text("openaq_archive", f"{self.archive_url}/?list-type=2&prefix={prefix}&max-keys=1000")
+            root = ET.fromstring(text)
+            for node in root.findall("{http://s3.amazonaws.com/doc/2006-03-01/}Contents"):
+                key = node.findtext("{http://s3.amazonaws.com/doc/2006-03-01/}Key")
+                size = node.findtext("{http://s3.amazonaws.com/doc/2006-03-01/}Size")
+                if key:
+                    day = date.fromisoformat(key.rsplit("-", 1)[-1].replace(".csv.gz", "")[:4] + "-" + key.rsplit("-", 1)[-1][4:6] + "-" + key.rsplit("-", 1)[-1][6:8])
+                    if start <= day <= end:
+                        keys.append({"key": key, "size": int(size or 0), "date": day.isoformat()})
+            month += 1
+            if month == 13:
+                year, month = year + 1, 1
+        return keys
+
+    def download_archive_file(self, key: str) -> tuple[bytes, str]:
+        url = f"{self.archive_url}/{key}"
+        response = __import__("httpx").get(url, timeout=__import__("httpx").Timeout(connect=5, read=30, write=30, pool=5))
+        response.raise_for_status()
+        path = self.client.cache_root / "openaq_archive" / key
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if not path.is_file() or path.stat().st_size != len(response.content):
+            path.write_bytes(response.content)
+        return response.content, str(path)
+
+    @staticmethod
+    def archive_sensor_hourly(frame: pd.DataFrame, mapped_location: dict[str, Any]) -> pd.DataFrame:
+        rows: list[dict[str, Any]] = []
+        for record in frame.to_dict("records"):
+            pollutant = normalise_pollutant(record.get("parameter"))
+            if not pollutant:
+                continue
+            value = float(record["value"]) if pd.notna(record.get("value")) else None
+            conversion = convert_pollutant(value, record.get("units"), pollutant)
+            timestamp = pd.to_datetime(record.get("datetime"), utc=True, errors="coerce")
+            if pd.isna(timestamp):
+                continue
+            rows.append({"city_id": mapped_location.get("city_id"), "state_id": mapped_location.get("state"), "station_id": mapped_location["station_id"], "station_name": mapped_location.get("station_name"), "sensor_id": f"openaq-{record.get('sensors_id')}", "timestamp_utc": timestamp, "pollutant": pollutant, "value": conversion.value_canonical, "unit": conversion.unit_canonical, "value_original": value, "unit_original": record.get("units"), "latitude": record.get("lat"), "longitude": record.get("lon"), "source": "openaq_archive", "provider": "OpenAQ", "quality_flags": conversion.flags, "provenance_id": mapped_location["location_id"]})
+        return pd.DataFrame(rows)
