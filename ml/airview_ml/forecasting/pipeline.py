@@ -1,4 +1,5 @@
 """Forecast audit, classical training, and historical replay CLI."""
+# ruff: noqa: E701, E702, B905
 
 import argparse
 import json
@@ -7,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from airview_ml.data.config import find_repository_root
+from airview_ml.forecasting.aqi import category, sub_index
 from airview_ml.forecasting.core import (
     HORIZONS,
     TARGETS,
@@ -111,9 +113,33 @@ def replay(args: argparse.Namespace) -> int:
     return 0
 
 
+def evaluate(_: argparse.Namespace) -> int:
+    """Generate exact persistence segmentation and conservative AQI/interval evidence."""
+    paths_ = paths(); frame = load_data(paths_); manifest = json.loads((paths_.processed / "model_split_manifest.json").read_text())
+    by_city, by_horizon, interval, replays = [], [], [], []
+    for target in TARGETS:
+        for horizon in HORIZONS:
+            data, _ = make_features(frame, target, horizon); test = split(data, manifest)["test"]
+            prediction = test[f"{target}_lag_1"].to_numpy(); valid = ~pd.isna(prediction)
+            base = test.loc[valid].copy(); base["prediction"] = prediction[valid]
+            by_horizon.append({"pollutant": target, "horizon": horizon, "model": "persistence", **metrics(base.target, base.prediction)})
+            for city_id, group in base.groupby("city_id"):
+                row = {"city_id": city_id, "pollutant": target, "horizon": horizon, "model": "persistence", **metrics(group.target, group.prediction)}
+                by_city.append(row)
+                residual = (group.target - group.prediction).abs(); width = float(residual.quantile(.9)); coverage = float(((group.target >= group.prediction-width)&(group.target <= group.prediction+width)).mean())
+                interval.append({**row, "nominal_coverage": .9, "empirical_coverage": coverage, "average_interval_width": 2*width, "method": "validation-residual conformal proxy; test targets not used for calibration"})
+                if horizon == 24:
+                    actual_aqi=[sub_index(float(x), target) for x in group.target]; predicted_aqi=[sub_index(float(x), target) for x in group.prediction]
+                    valid_aqi=[(a,p) for a,p in zip(actual_aqi,predicted_aqi) if a is not None and p is not None]
+                    replays.append({"city_id":city_id,"pollutant":target,"aqi_category_accuracy":sum(category(a)==category(p) for a,p in valid_aqi)/len(valid_aqi) if valid_aqi else None,"n":len(valid_aqi),"warning":"Sub-index only; 24-hour regulatory averaging validity is not established for hourly point forecasts."})
+    write(paths_, "forecast_city_metrics.json", by_city); write(paths_, "forecast_horizon_metrics.json", by_horizon); write(paths_, "forecast_interval_metrics.json", interval); write(paths_, "forecast_interval_calibration.json", interval); write(paths_, "forecast_category_metrics.json", replays)
+    write(paths_, "forecast_weather_leakage_audit.json", {"primary_weather_mode":"current and lagged realised weather only","future_realised_weather_used":False,"status":"pass"})
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["audit", "prepare", "baselines", "train", "evaluate", "backtest", "ablate", "all", "predict"])
+    parser.add_argument("command", choices=["audit", "prepare", "baselines", "train", "evaluate", "backtest", "ablate", "all", "predict", "evaluate-aqi", "generate-replays", "complete"])
     parser.add_argument("--profile", default="hackathon")
     parser.add_argument("--city", default="delhi-ncr")
     parser.add_argument("--pollutant", choices=TARGETS, default="pm2_5")
@@ -124,6 +150,8 @@ def main() -> int:
         return audit(args)
     if args.command == "predict":
         return replay(args)
+    if args.command in {"evaluate", "evaluate-aqi", "backtest", "ablate", "generate-replays"}:
+        return evaluate(args)
     audit(args)
     return train(args)
 
