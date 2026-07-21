@@ -178,3 +178,6 @@ available values and never backfill missing sources with generated observations.
 ## License
 
 [MIT](LICENSE)
+# AirView AI
+
+AirView AI includes historical forecasting and a transparent station-centred intelligence screening layer. Run `python -m airview_ml.intelligence.pipeline all --profile hackathon --resume` from `ml` to regenerate intelligence reports. These outputs are decision support, not regulatory source apportionment or causal intervention measurement.

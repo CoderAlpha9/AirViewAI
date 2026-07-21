@@ -1,0 +1,119 @@
+{
+  "city_id": "amritsar",
+  "station_id": "openaq-5551",
+  "issue_timestamp_utc": "2025-07-05 19:00:00+00:00",
+  "observed_pm2_5": 999.9900000000001,
+  "source_indicator": {
+    "attribution_id": "amritsar-openaq-5551-2025070508-pm2_5-secondary_formation_and_meteorological_accumulation",
+    "city_id": "amritsar",
+    "station_id": "openaq-5551",
+    "timestamp_utc": "2025-07-05 08:00:00+00:00",
+    "latitude": 31.62,
+    "longitude": 74.876512,
+    "pollutant": "pm2_5",
+    "forecast_horizon": 24,
+    "source_category": "secondary_formation_and_meteorological_accumulation",
+    "likelihood_score": 0.5737,
+    "confidence_score": 0.6,
+    "evidence_availability": 0.8,
+    "pollutant_pattern_score": 0.4826,
+    "temporal_pattern_score": 0.7975,
+    "spatial_score": 0.0,
+    "wind_alignment_score": 0.7975,
+    "regional_event_score": 0.9635790594158262,
+    "forecast_severity_score": 0.4847,
+    "attribution_level": "dominant",
+    "dominant_evidence": "real pollutant and weather history",
+    "contradictory_evidence": [],
+    "missing_evidence": [
+      "Sentinel-5P valid pixels",
+      "GHSL population",
+      "mapped OSM source features"
+    ],
+    "limitations": [
+      "relative source influence screening only; not source apportionment or emissions contribution"
+    ],
+    "methodology_version": "0.1.0-screening",
+    "replay_status": "historical_replay"
+  },
+  "priority": {
+    "city_id": "amritsar",
+    "station_id": "openaq-5551",
+    "timestamp_utc": "2025-07-05 19:00:00+00:00",
+    "pollutant": "pm2_5",
+    "severity": 1,
+    "source_category": "secondary_formation_and_meteorological_accumulation",
+    "confidence": 0.6,
+    "priority_score": 0.71,
+    "priority_tier": "High",
+    "recommended_inspection": "authorised official review; verify local conditions before action",
+    "limitations": [
+      "station-centred source-risk screening, not a measured hotspot surface"
+    ]
+  },
+  "scenarios": [
+    {
+      "city_id": "amritsar",
+      "station_id": "openaq-5551",
+      "timestamp_utc": "2025-07-05 19:00:00+00:00",
+      "pollutant": "pm2_5",
+      "severity": 1,
+      "source_category": "secondary_formation_and_meteorological_accumulation",
+      "confidence": 0.6,
+      "priority_score": 0.71,
+      "priority_tier": "High",
+      "recommended_inspection": "authorised official review; verify local conditions before action",
+      "limitations": [
+        "not a proven causal intervention effect; no emissions rates"
+      ],
+      "scenario_strength": "low",
+      "assumption": "relative source-pressure indicator reduction, not causal efficacy",
+      "baseline_forecast_proxy": 250,
+      "scenario_sensitivity_estimate": 246.25,
+      "estimated_difference": 3.75
+    },
+    {
+      "city_id": "amritsar",
+      "station_id": "openaq-5551",
+      "timestamp_utc": "2025-07-05 19:00:00+00:00",
+      "pollutant": "pm2_5",
+      "severity": 1,
+      "source_category": "secondary_formation_and_meteorological_accumulation",
+      "confidence": 0.6,
+      "priority_score": 0.71,
+      "priority_tier": "High",
+      "recommended_inspection": "authorised official review; verify local conditions before action",
+      "limitations": [
+        "not a proven causal intervention effect; no emissions rates"
+      ],
+      "scenario_strength": "medium",
+      "assumption": "relative source-pressure indicator reduction, not causal efficacy",
+      "baseline_forecast_proxy": 250,
+      "scenario_sensitivity_estimate": 240.62,
+      "estimated_difference": 9.38
+    },
+    {
+      "city_id": "amritsar",
+      "station_id": "openaq-5551",
+      "timestamp_utc": "2025-07-05 19:00:00+00:00",
+      "pollutant": "pm2_5",
+      "severity": 1,
+      "source_category": "secondary_formation_and_meteorological_accumulation",
+      "confidence": 0.6,
+      "priority_score": 0.71,
+      "priority_tier": "High",
+      "recommended_inspection": "authorised official review; verify local conditions before action",
+      "limitations": [
+        "not a proven causal intervention effect; no emissions rates"
+      ],
+      "scenario_strength": "high",
+      "assumption": "relative source-pressure indicator reduction, not causal efficacy",
+      "baseline_forecast_proxy": 250,
+      "scenario_sensitivity_estimate": 235.0,
+      "estimated_difference": 15.0
+    }
+  ],
+  "limitations": [
+    "historical station-centred replay; not live source confirmation"
+  ]
+}

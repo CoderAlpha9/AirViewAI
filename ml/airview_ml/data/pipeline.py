@@ -11,7 +11,6 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from dotenv import load_dotenv
 
 from airview_ml.data.adapters import (
     CpcbAdapter,
@@ -25,6 +24,7 @@ from airview_ml.data.adapters import (
 from airview_ml.data.archive import build_download_plan, rank_locations
 from airview_ml.data.config import PROFILES, PipelineSettings, find_repository_root
 from airview_ml.data.contracts import AirQualityRecord, SourceResult, serialise
+from airview_ml.data.environment import credential_status, load_environment
 from airview_ml.data.http import CachedHttpClient
 from airview_ml.data.mapping import map_locations
 from airview_ml.data.quality import validate_air_quality
@@ -34,7 +34,7 @@ from airview_ml.data.reporting import empty_run, inventory_entry, load_report, w
 
 def _settings(args: argparse.Namespace) -> PipelineSettings:
     root = find_repository_root()
-    load_dotenv(root / "backend" / ".env", override=False)
+    load_environment(root)
     return PipelineSettings(root, Path(args.cache_dir) if args.cache_dir else None, Path(args.output_dir) if args.output_dir else None)
 
 
@@ -53,9 +53,8 @@ def _selected_cities(args: argparse.Namespace, profile_name: str) -> list[dict[s
 
 
 def credentials(args: argparse.Namespace) -> int:
-    _settings(args)
-    names = ["DATA_GOV_IN_API_KEY", "OPENAQ_API_KEY", "NASA_FIRMS_MAP_KEY", "COPERNICUS_CLIENT_ID", "COPERNICUS_CLIENT_SECRET"]
-    print(json.dumps({name: {"configured": bool(os.getenv(name))} for name in names}, indent=2))
+    settings = _settings(args)
+    print(json.dumps(credential_status(settings.repository_root), indent=2))
     return 0
 
 

@@ -1,0 +1,8 @@
+{
+  "methodology_version": "0.1.0-screening",
+  "attribution_weights": {"pollutant_pattern": 0.22, "temporal_pattern": 0.14, "spatial": 0.18, "wind_alignment": 0.18, "regional_event": 0.16, "forecast_severity": 0.12},
+  "priority_weights": {"severity": 0.34, "confidence": 0.2, "persistence": 0.16, "controllability": 0.15, "vulnerability": 0.15},
+  "scenario_strength": {"low": 0.1, "medium": 0.25, "high": 0.4},
+  "distance_decay_km": 35.0,
+  "temporal_half_life_hours": 12.0
+}
