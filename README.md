@@ -147,11 +147,33 @@ enforcement prioritisation, impact estimation, advisories, and the command dashb
 
 ## Data transparency
 
-There is no live CPCB, CAAQMS, satellite, traffic, or municipal integration in this foundation.
-The interface contains no fake live readings, wards, model metrics, or claimed accuracy. Any
-future simulated or semi-synthetic data will always be labelled honestly in its source metadata,
-documentation, and user-facing presentation. A source will only be described as live after a
-working adapter is connected, monitored, and documented.
+AirView now includes a source-honest acquisition layer. It has adapters for Data.gov.in/CPCB,
+OpenAQ v3 and its unsigned public archive, Open-Meteo, Copernicus Sentinel-5P, NASA FIRMS,
+OpenStreetMap/Overpass, and GHSL. Credentialed sources remain explicitly unavailable until a real
+request succeeds; no current-reading, satellite, fire, population, traffic, or city metric is
+invented when credentials or a stable source download are absent. See the
+[data-source inventory](docs/methodology/data-sources.md) and
+[data limitations](docs/methodology/data-limitations.md).
+
+## Data pipeline
+
+Set optional credential variables in `backend/.env` (all placeholders are in
+`backend/.env.example`), then run:
+
+```powershell
+.\.venv\Scripts\python.exe -m airview_ml.data.pipeline credentials
+.\.venv\Scripts\python.exe -m airview_ml.data.pipeline fetch --profile smoke
+```
+
+Profiles are `smoke`, `hackathon`, and `full-india`; source-specific runs use
+`fetch --source weather`, `cpcb`, `openaq`, `sentinel5p`, `firms`, `osm`, or `ghsl`.
+Processed files use Parquet and reports use JSON. Raw cache and large processed output are ignored
+by Git. The frontend’s `/data-readiness` route reads generated backend reports only.
+
+Canonical air-quality records preserve provider and source, location/station/sensor identity,
+original and canonical values/units, UTC and source-local time, retrieval time, licence,
+provenance, validity, and quality flags. Integrated feature tables are built only from real
+available values and never backfill missing sources with generated observations.
 
 ## License
 

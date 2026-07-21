@@ -1,4 +1,4 @@
-.PHONY: frontend-install backend-install frontend-dev backend-dev frontend-build frontend-typecheck frontend-lint backend-test backend-lint ml-test validate
+.PHONY: frontend-install backend-install frontend-dev backend-dev frontend-build frontend-typecheck frontend-lint backend-test backend-lint ml-test data-credentials data-smoke data-hackathon data-full validate
 
 frontend-install:
 	npm --prefix frontend install
@@ -31,5 +31,16 @@ backend-lint:
 ml-test:
 	python -m pytest ml/tests
 
-validate: frontend-typecheck frontend-lint frontend-build backend-lint backend-test ml-test
+data-credentials:
+	python -m airview_ml.data.pipeline credentials
 
+data-smoke:
+	python -m airview_ml.data.pipeline fetch --profile smoke
+
+data-hackathon:
+	python -m airview_ml.data.pipeline fetch --profile hackathon
+
+data-full:
+	python -m airview_ml.data.pipeline fetch --profile full-india
+
+validate: frontend-typecheck frontend-lint frontend-build backend-lint backend-test ml-test
