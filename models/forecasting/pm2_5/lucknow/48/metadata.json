@@ -1,0 +1,10 @@
+{
+  "model_id": "pm2_5-lucknow-48-ridge",
+  "pollutant": "pm2_5",
+  "scope": "lucknow",
+  "horizon": 48,
+  "family": "ridge",
+  "created_at_utc": "2026-07-21T09:30:02.970746+00:00",
+  "dataset_fingerprint": "1ef028fa95dec19c88a88154ba7b7122e92c96e7b0708e3070d461a799d3fd3e",
+  "limitations": "One selected station represents this city; local model is effectively station-specific."
+}

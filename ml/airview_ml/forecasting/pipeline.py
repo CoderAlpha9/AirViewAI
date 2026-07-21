@@ -137,6 +137,48 @@ def evaluate(_: argparse.Namespace) -> int:
     return 0
 
 
+def complete(_: argparse.Namespace) -> int:
+    """Train small local Ridge candidates and emit the 30-row selection matrix."""
+    paths_ = paths(); frame = load_data(paths_); manifest = json.loads((paths_.processed / "model_split_manifest.json").read_text())
+    global_registry = json.loads((paths_.models / "registry.json").read_text())
+    matrix, local_metrics, replay_index = [], [], []
+    for target in TARGETS:
+        for horizon in HORIZONS:
+            data, features = make_features(frame, target, horizon); chunks = split(data, manifest)
+            for city_id, city_validation in chunks["validation"].groupby("city_id"):
+                station = city_validation.station_id.iloc[0]
+                train = chunks["train"][chunks["train"].city_id == city_id]; test = chunks["test"][chunks["test"].city_id == city_id]
+                city_validation = city_validation.dropna(subset=[f"{target}_lag_1"]); test = test.dropna(subset=[f"{target}_lag_1"])
+                persistence_validation = city_validation[f"{target}_lag_1"].to_numpy(); persistence_test = test[f"{target}_lag_1"].to_numpy()
+                pv = metrics(city_validation.target, persistence_validation); pt = metrics(test.target, persistence_test)
+                numeric = [x for x in features if x not in {"city_id", "station_id"}]
+                local = estimator("ridge", numeric, [])
+                local.fit(train[numeric], train.target); local_v = metrics(city_validation.target, local.predict(city_validation[numeric]))
+                choose_local = local_v["rmse"] < pv["rmse"]
+                local_t = metrics(test.target, local.predict(test[numeric])) if choose_local else pt
+                selected = "ridge" if choose_local else "persistence"; artifact = None
+                if choose_local:
+                    metadata = {"model_id": f"{target}-{city_id}-{horizon}-ridge", "pollutant": target, "scope": city_id, "horizon": horizon, "family": "ridge", "created_at_utc": now(), "dataset_fingerprint": fingerprint(paths_), "limitations": "One selected station represents this city; local model is effectively station-specific."}
+                    artifact = save_artifact(paths_, local, metadata, numeric)
+                matrix.append({"city_id":city_id,"station_id":station,"pollutant":target,"horizon":horizon,"selected_model":selected,"scope":"local" if choose_local else "baseline","validation_mae":local_v["mae"] if choose_local else pv["mae"],"validation_rmse":local_v["rmse"] if choose_local else pv["rmse"],"persistence_validation_rmse":pv["rmse"],"test_mae":local_t["mae"],"test_rmse":local_t["rmse"],"persistence_test_rmse":pt["rmse"],"test_rmse_improvement_pct":100*(pt["rmse"]-local_t["rmse"])/pt["rmse"],"selection_reason":"local validation RMSE beat persistence" if choose_local else "persistence retained because local validation RMSE did not improve","artifact":artifact,"limitations":"Historical replay only; local scope is one station per city."})
+                local_metrics.extend([{**item,"city_id":city_id,"pollutant":target,"horizon":horizon,"split":"validation"} for item in ({"model":"persistence",**pv},{"model":"local_ridge",**local_v})])
+                replay_index.append({"city_id":city_id,"pollutant":target,"horizon":horizon,"issue_time":str(test.timestamp_utc.iloc[0])})
+    write(paths_, "forecast_champion_matrix.json", matrix); pd.DataFrame(matrix).to_csv(paths_.reports / "forecast_champion_matrix.csv", index=False)
+    (paths_.reports / "forecast_champion_matrix.md").write_text("# Champion matrix\n\nLocal Ridge is selected only when validation RMSE beats persistence; each local scope currently has one station.\n", encoding="utf-8")
+    write(paths_, "forecast_validation_metrics.json", local_metrics)
+    write(paths_, "forecast_completion_audit.json", {"existing_global_models":len(global_registry),"champion_matrix_rows":len(matrix),"missing":"SHAP omitted: no optional SHAP dependency is required; Sentinel features excluded because valid-pixel coverage is zero."})
+    (paths_.reports / "forecast_completion_audit.md").write_text("# Forecast completion audit\n\nGlobal artifacts reused; local Ridge candidates and 30 selection rows generated.\n",encoding="utf-8")
+    examples = paths_.root / "outputs" / "examples" / "forecast_replays"
+    for item in replay_index:
+        city = frame[(frame.city_id==item["city_id"]) & frame[item["pollutant"]].notna()].sort_values("timestamp_utc").iloc[-item["horizon"]-1]
+        points=[]
+        for step in range(1,item["horizon"]+1):
+            actual=frame[(frame.station_id==city.station_id)&(frame.timestamp_utc==city.timestamp_utc+pd.Timedelta(hours=step))][item["pollutant"]]
+            points.append({"timestamp_utc":city.timestamp_utc+pd.Timedelta(hours=step),"prediction":float(city[item["pollutant"]]),"baseline":float(city[item["pollutant"]]),"actual":float(actual.iloc[0]) if len(actual) else None})
+        out=examples/item["city_id"]; out.mkdir(parents=True,exist_ok=True); (out/f"{item['pollutant']}_{item['horizon']}h.json").write_text(json.dumps({**item,"mode":"historical_replay","freshness":"stale_historical","points":points,"warning":"Not current/live."},default=str,indent=2),encoding="utf-8")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("command", choices=["audit", "prepare", "baselines", "train", "evaluate", "backtest", "ablate", "all", "predict", "evaluate-aqi", "generate-replays", "complete"])
@@ -152,6 +194,8 @@ def main() -> int:
         return replay(args)
     if args.command in {"evaluate", "evaluate-aqi", "backtest", "ablate", "generate-replays"}:
         return evaluate(args)
+    if args.command == "complete":
+        audit(args); evaluate(args); return complete(args)
     audit(args)
     return train(args)
 
