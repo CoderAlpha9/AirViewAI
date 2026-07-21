@@ -1,0 +1,37 @@
+{
+  "model_id": "pm2_5-global-72-ridge",
+  "pollutant": "pm2_5",
+  "scope": "global",
+  "horizon": 72,
+  "family": "ridge",
+  "created_at_utc": "2026-07-21T09:02:51.881245+00:00",
+  "dataset_fingerprint": "1ef028fa95dec19c88a88154ba7b7122e92c96e7b0708e3070d461a799d3fd3e",
+  "interval_half_width_90": 133.11092407691754,
+  "validation_persistence": {
+    "pollutant": "pm2_5",
+    "horizon": 72,
+    "model": "persistence",
+    "split": "validation",
+    "n": 12527,
+    "mae": 58.335358093185384,
+    "rmse": 100.87556242130078,
+    "r2": -0.029767047156920023,
+    "bias": -1.4483727814587162,
+    "median_absolute_error": 31.0,
+    "smape": 50.13500278767562
+  },
+  "test_metrics": {
+    "pollutant": "pm2_5",
+    "horizon": 72,
+    "champion": "ridge",
+    "split": "test",
+    "n": 2770,
+    "mae": 32.483647129139726,
+    "rmse": 48.8391605958479,
+    "r2": -0.04058775980866436,
+    "bias": -26.011144381849775,
+    "median_absolute_error": 20.699623087631927,
+    "smape": 47.78797377687323
+  },
+  "weather_mode": "current and lagged weather only; no future realised weather"
+}
