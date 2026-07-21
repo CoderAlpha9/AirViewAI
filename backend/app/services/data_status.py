@@ -10,6 +10,15 @@ REPORT_NAMES = {
     "stations": "india_station_registry.json",
     "readiness": "city_readiness_report.json",
     "pipeline": "data_pipeline_run.json",
+    "archive_availability": "openaq_india_archive_availability.json",
+    "archive_plan": "openaq_download_plan.json",
+    "model_readiness": "model_data_readiness.json",
+    "cpcb": "cpcb_recovery_report.json",
+    "sentinel": "sentinel5p_validation_report.json",
+    "firms": "firms_validation_report.json",
+    "ghsl": "ghsl_ingestion_report.json",
+    "osm": "osm_city_coverage_report.json",
+    "failures": "source_failures.json",
 }
 
 

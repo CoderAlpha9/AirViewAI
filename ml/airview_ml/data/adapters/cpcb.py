@@ -12,10 +12,11 @@ class CpcbAdapter:
     resource_id = "3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69"
     official_url = "https://www.data.gov.in/resource/real-time-air-quality-index-various-locations"
 
-    def __init__(self, client: CachedHttpClient, api_key: str | None, request_limit: int = 1_000) -> None:
+    def __init__(self, client: CachedHttpClient, api_key: str | None, request_limit: int = 100) -> None:
         self.client = client
         self.api_key = api_key
-        self.request_limit = request_limit
+        self.request_limit = min(max(1, request_limit), 100)
+        self.last_recovery: dict[str, Any] = {}
 
     def fetch_latest(self, state: str | None = None, city: str | None = None) -> tuple[list[AirQualityRecord], SourceResult]:
         if not self.api_key:
@@ -31,6 +32,10 @@ class CpcbAdapter:
         records: list[AirQualityRecord] = []
         offset = 0
         cache_path = None
+        seen_pages: set[str] = set()
+        pages = 0
+        retries = 0
+        self.last_recovery = {"endpoint": f"https://api.data.gov.in/resource/{self.resource_id}", "resource_id": self.resource_id, "page_size": self.request_limit, "pages_retrieved": 0, "records_retrieved": 0, "retries": 0, "timeouts": "connect=8s, read=30s, write=30s, pool=8s", "fallback_status": "not_attempted_no_official_export_url_configured", "retrieved_at_utc": datetime.now(timezone.utc).isoformat()}
         try:
             while True:
                 params: dict[str, Any] = {
@@ -49,20 +54,28 @@ class CpcbAdapter:
                     params=params,
                 )
                 page = payload.get("records", []) if isinstance(payload, dict) else []
+                fingerprint = repr([(row.get("station"), row.get("pollutant_id"), row.get("last_update")) for row in page])
+                if fingerprint in seen_pages:
+                    self.last_recovery["repeated_page_detected"] = True
+                    break
+                seen_pages.add(fingerprint)
                 records.extend(self.parse_records(page))
+                pages += 1
                 if len(page) < self.request_limit:
                     break
                 offset += len(page)
         except Exception as exc:  # surfaced as a source report, not fabricated data
-            return [], SourceResult(
+            self.last_recovery.update({"pages_retrieved": pages, "records_retrieved": len(records), "exact_failure_reason": str(exc), "retries": retries})
+            return records, SourceResult(
                 source=self.source,
-                status="failed",
+                status="partial" if records else "failed",
                 retrieved_at_utc=datetime.now(timezone.utc),
                 official_url=self.official_url,
                 credential_requirement="DATA_GOV_IN_API_KEY",
                 licence="NDSAP",
                 error=str(exc),
             )
+        self.last_recovery.update({"pages_retrieved": pages, "records_retrieved": len(records), "offset_after_last_success": offset, "http_status": 200})
         return records, SourceResult(
             source=self.source,
             status="success",

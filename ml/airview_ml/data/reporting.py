@@ -20,6 +20,17 @@ REPORT_NAMES = {
     "openaq_location_mapping_report": "openaq_location_mapping_report.json",
     "unresolved_openaq_locations": "unresolved_openaq_locations.json",
     "ambiguous_station_matches": "ambiguous_station_matches.json",
+    "openaq_india_archive_availability": "openaq_india_archive_availability.json",
+    "openaq_download_plan": "openaq_download_plan.json",
+    "model_data_readiness": "model_data_readiness.json",
+    "cpcb_recovery_report": "cpcb_recovery_report.json",
+    "cpcb_openaq_station_crosswalk": "cpcb_openaq_station_crosswalk.json",
+    "sentinel5p_validation_report": "sentinel5p_validation_report.json",
+    "sentinel5p_coverage_report": "sentinel5p_coverage_report.json",
+    "firms_validation_report": "firms_validation_report.json",
+    "firms_city_coverage_report": "firms_city_coverage_report.json",
+    "ghsl_ingestion_report": "ghsl_ingestion_report.json",
+    "osm_city_coverage_report": "osm_city_coverage_report.json",
 }
 
 

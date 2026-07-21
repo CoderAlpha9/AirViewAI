@@ -124,31 +124,71 @@ class OpenAQAdapter:
 
     def list_archive_files(self, location_id: int, start: date, end: date) -> list[dict[str, Any]]:
         keys: list[dict[str, Any]] = []
-        year, month = start.year, start.month
-        while (year, month) <= (end.year, end.month):
-            prefix = f"records/csv.gz/locationid={location_id}/year={year}/month={month:02d}/"
-            text, _, _ = self.client.get_text("openaq_archive", f"{self.archive_url}/?list-type=2&prefix={prefix}&max-keys=1000")
-            root = ET.fromstring(text)
-            for node in root.findall("{http://s3.amazonaws.com/doc/2006-03-01/}Contents"):
-                key = node.findtext("{http://s3.amazonaws.com/doc/2006-03-01/}Key")
-                size = node.findtext("{http://s3.amazonaws.com/doc/2006-03-01/}Size")
+        # One yearly S3 list is normally enough (daily files are <1000/year) and
+        # is dramatically cheaper than probing every month during an India audit.
+        for year in range(start.year, end.year + 1):
+            prefix = f"records/csv.gz/locationid={location_id}/year={year}/"
+            for item in self._list_s3(prefix):
+                key = item.get("key")
                 if key:
-                    day = date.fromisoformat(key.rsplit("-", 1)[-1].replace(".csv.gz", "")[:4] + "-" + key.rsplit("-", 1)[-1][4:6] + "-" + key.rsplit("-", 1)[-1][6:8])
-                    if start <= day <= end:
-                        keys.append({"key": key, "size": int(size or 0), "date": day.isoformat()})
-            month += 1
-            if month == 13:
-                year, month = year + 1, 1
+                    day = _archive_day(key)
+                    if day and start <= day <= end:
+                        keys.append({"key": key, "size": int(item.get("size") or 0), "date": day.isoformat(), "etag": item.get("etag")})
         return keys
 
-    def download_archive_file(self, key: str) -> tuple[bytes, str]:
+    def audit_archive_location(self, location_id: int, start: date, end: date, location: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Inspect only S3 listings. No archive object is downloaded by this operation."""
+        files = self.list_archive_files(location_id, start, end)
+        months = sorted({item["date"][:7] for item in files})
+        sensors = (location or {}).get("sensors", [])
+        pollutants = sorted({str((sensor.get("parameter") or {}).get("name") or "").lower() for sensor in sensors if (sensor.get("parameter") or {}).get("name")})
+        return {
+            "location_id": location_id,
+            "requested_start": start.isoformat(),
+            "requested_end": end.isoformat(),
+            "available_years": sorted({month[:4] for month in months}),
+            "available_months": months,
+            "supported_pollutants_from_provider_metadata": pollutants,
+            "most_recent_file": max(files, key=lambda item: item["date"], default=None),
+            "estimated_file_count": len(files),
+            "estimated_size_bytes": sum(int(item["size"]) for item in files),
+            "index_status": "success",
+        }
+
+    def _list_s3(self, prefix: str) -> list[dict[str, str | int | None]]:
+        """List an S3 prefix completely, following continuation tokens deterministically."""
+        items: list[dict[str, str | int | None]] = []
+        token: str | None = None
+        while True:
+            suffix = f"?list-type=2&prefix={prefix}&max-keys=1000"
+            if token:
+                suffix += f"&continuation-token={token}"
+            text, _, _ = self.client.get_text("openaq_archive", f"{self.archive_url}/{suffix}")
+            root = ET.fromstring(text)
+            namespace = "{http://s3.amazonaws.com/doc/2006-03-01/}"
+            for node in root.findall(f"{namespace}Contents"):
+                items.append({"key": node.findtext(f"{namespace}Key"), "size": int(node.findtext(f"{namespace}Size") or 0), "etag": node.findtext(f"{namespace}ETag")})
+            truncated = root.findtext(f"{namespace}IsTruncated") == "true"
+            token = root.findtext(f"{namespace}NextContinuationToken")
+            if not truncated or not token:
+                return items
+
+    def download_archive_file(self, key: str, expected_size: int | None = None) -> tuple[bytes, str]:
         url = f"{self.archive_url}/{key}"
-        response = __import__("httpx").get(url, timeout=__import__("httpx").Timeout(connect=5, read=30, write=30, pool=5))
-        response.raise_for_status()
         path = self.client.cache_root / "openaq_archive" / key
         path.parent.mkdir(parents=True, exist_ok=True)
-        if not path.is_file() or path.stat().st_size != len(response.content):
-            path.write_bytes(response.content)
+        if path.is_file() and (expected_size is None or path.stat().st_size == expected_size):
+            content = path.read_bytes()
+            self.decompress_csv(content)  # verified cache entries are safe to resume from
+            return content, str(path)
+        partial = path.with_suffix(path.suffix + ".partial")
+        response = __import__("httpx").get(url, timeout=__import__("httpx").Timeout(connect=8, read=60, write=60, pool=8))
+        response.raise_for_status()
+        partial.write_bytes(response.content)
+        if expected_size is not None and partial.stat().st_size != expected_size:
+            raise RuntimeError(f"archive size mismatch for {key}: expected {expected_size}, got {partial.stat().st_size}")
+        self.decompress_csv(partial.read_bytes())  # gzip and CSV integrity validation before promotion
+        partial.replace(path)
         return response.content, str(path)
 
     @staticmethod
@@ -165,3 +205,11 @@ class OpenAQAdapter:
                 continue
             rows.append({"city_id": mapped_location.get("city_id"), "state_id": mapped_location.get("state"), "station_id": mapped_location["station_id"], "station_name": mapped_location.get("station_name"), "sensor_id": f"openaq-{record.get('sensors_id')}", "timestamp_utc": timestamp, "pollutant": pollutant, "value": conversion.value_canonical, "unit": conversion.unit_canonical, "value_original": value, "unit_original": record.get("units"), "latitude": record.get("lat"), "longitude": record.get("lon"), "source": "openaq_archive", "provider": "OpenAQ", "quality_flags": conversion.flags, "provenance_id": mapped_location["location_id"]})
         return pd.DataFrame(rows)
+
+
+def _archive_day(key: str) -> date | None:
+    try:
+        stamp = key.rsplit("-", 1)[-1].replace(".csv.gz", "")
+        return date.fromisoformat(f"{stamp[:4]}-{stamp[4:6]}-{stamp[6:8]}")
+    except (IndexError, ValueError):
+        return None

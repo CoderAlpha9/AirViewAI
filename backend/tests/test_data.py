@@ -25,3 +25,13 @@ async def test_city_not_found_is_explicit(client: AsyncClient, monkeypatch, tmp_
 
     assert response.status_code == 200
     assert response.json()["status"] == "not_found"
+
+
+async def test_archive_and_model_reports_are_explicit_before_generation(client: AsyncClient, monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(data_status, "reports_directory", lambda: tmp_path)
+
+    archive = await client.get("/api/data/archive/plan")
+    model = await client.get("/api/data/model-readiness")
+
+    assert archive.json()["status"] == "not_ready"
+    assert model.json()["status"] == "not_ready"

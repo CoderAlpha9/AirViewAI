@@ -1,6 +1,6 @@
 import csv
 import io
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import httpx
@@ -15,7 +15,7 @@ class FirmsAdapter:
     def __init__(self, map_key: str | None) -> None:
         self.map_key = map_key
 
-    def fetch_area(self, bbox: tuple[float, float, float, float], days: int = 1) -> tuple[list[dict[str, Any]], SourceResult]:
+    def fetch_area(self, bbox: tuple[float, float, float, float], days: int = 1, end_date: date | None = None) -> tuple[list[dict[str, Any]], SourceResult]:
         if not self.map_key:
             return [], SourceResult(
                 source=self.source,
@@ -26,11 +26,22 @@ class FirmsAdapter:
                 error="Request a free NASA FIRMS MAP_KEY; no key is bundled.",
             )
         bbox_text = ",".join(str(value) for value in bbox)
-        url = f"https://firms.modaps.eosdis.nasa.gov/api/area/csv/{self.map_key}/VIIRS_SNPP_NRT/{bbox_text}/{days}"
+        finish = end_date or date.today()
+        windows = []
+        remaining, cursor = max(days, 1), finish - timedelta(days=max(days, 1) - 1)
+        while remaining:
+            window_days = min(5, remaining)  # official FIRMS Area API maximum
+            windows.append((window_days, cursor))
+            cursor += timedelta(days=window_days)
+            remaining -= window_days
         try:
-            response = httpx.get(url, timeout=30)
-            response.raise_for_status()
-            rows = list(csv.DictReader(io.StringIO(response.text)))
+            rows = []
+            for window_days, window_start in windows:
+                url = f"https://firms.modaps.eosdis.nasa.gov/api/area/csv/{self.map_key}/VIIRS_SNPP_NRT/{bbox_text}/{window_days}/{window_start.isoformat()}"
+                response = httpx.get(url, timeout=httpx.Timeout(connect=8, read=30, write=30, pool=8))
+                response.raise_for_status()
+                rows.extend(csv.DictReader(io.StringIO(response.text)))
+            rows = list({(row.get("latitude"), row.get("longitude"), row.get("acq_date"), row.get("acq_time"), row.get("frp")): row for row in rows}.values())
         except Exception as exc:
             return [], SourceResult(
                 source=self.source,

@@ -60,7 +60,7 @@ class PipelineSettings:
     output_dir: Path | None = None
     thresholds: EligibilityThresholds = field(default_factory=EligibilityThresholds)
     request_timeout_seconds: float = 30.0
-    request_limit: int = 1_000
+    request_limit: int = 100
 
     def __post_init__(self) -> None:
         self.repository_root = self.repository_root.resolve()

@@ -6,6 +6,7 @@ from airview_ml.data.adapters.cpcb import CpcbAdapter
 from airview_ml.data.adapters.openaq import OpenAQAdapter
 from airview_ml.data.adapters.sentinel5p import Sentinel5PAdapter
 from airview_ml.data.adapters.weather import OpenMeteoAdapter
+from airview_ml.data.archive import build_download_plan, rank_locations
 from airview_ml.data.config import EligibilityThresholds
 from airview_ml.data.contracts import AirQualityRecord
 from airview_ml.data.normalization import match_city, normalise_city_name, normalise_pollutant
@@ -72,3 +73,13 @@ def test_readiness_exclusion_reasons_are_explicit() -> None:
     score = readiness_score("city", {"active_station_count": 0}, EligibilityThresholds())
     assert not score.national_display_eligible
     assert "no valid station or current reading" in score.exclusion_reasons
+
+
+def test_archive_ranking_and_plan_require_real_archive_months() -> None:
+    locations = [{"id": 7, "coordinates": {"latitude": 28.6, "longitude": 77.2}, "sensors": [{"parameter": {"name": "pm25"}}, {"parameter": {"name": "pm10"}}]}]
+    mappings = [{"location_id": 7, "station_id": "openaq-7", "station_name": "Station", "city_id": "delhi-ncr", "mapping_confidence": "high"}]
+    availability = [{"location_id": 7, "available_months": [f"2025-{month:02d}" for month in range(1, 13)], "estimated_file_count": 300, "estimated_size_bytes": 1000, "most_recent_file": {"date": "2025-12-31"}}]
+    ranked = rank_locations(locations, mappings, availability)
+    plan = build_download_plan(ranked, start=datetime(2025, 1, 1).date(), end=datetime(2025, 12, 31).date())
+    assert ranked[0]["selection_score"] > 0
+    assert plan["selection_count"] == 1

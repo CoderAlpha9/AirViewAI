@@ -11,6 +11,15 @@ const reports = [
   ["Cities", "/data/cities"],
   ["Stations", "/data/stations"],
   ["Readiness", "/data/readiness"],
+  ["Archive availability", "/data/archive/availability"],
+  ["Download plan", "/data/archive/plan"],
+  ["Model readiness", "/data/model-readiness"],
+  ["CPCB recovery", "/data/sources/cpcb"],
+  ["Sentinel-5P", "/data/sources/sentinel"],
+  ["NASA FIRMS", "/data/sources/firms"],
+  ["GHSL population", "/data/sources/ghsl"],
+  ["OSM coverage", "/data/sources/osm"],
+  ["Source failures", "/data/sources/failures"],
   ["Latest pipeline run", "/data/pipeline/latest-run"],
 ] as const;
 

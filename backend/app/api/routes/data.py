@@ -48,3 +48,26 @@ async def readiness() -> dict:
 @router.get("/pipeline/latest-run")
 async def latest_pipeline_run() -> dict:
     return report_or_not_ready("pipeline")
+
+
+@router.get("/archive/availability")
+async def archive_availability() -> dict:
+    return report_or_not_ready("archive_availability")
+
+
+@router.get("/archive/plan")
+async def archive_plan() -> dict:
+    return report_or_not_ready("archive_plan")
+
+
+@router.get("/model-readiness")
+async def model_readiness() -> dict:
+    return report_or_not_ready("model_readiness")
+
+
+@router.get("/sources/{source}")
+async def source_status(source: str) -> dict:
+    reports = {"cpcb", "sentinel", "firms", "ghsl", "osm", "failures"}
+    if source not in reports:
+        return {"status": "not_found", "message": "Unknown source report.", "source": source}
+    return report_or_not_ready(source)

@@ -17,6 +17,11 @@ class CachedHttpClient:
         self.cache_root = cache_root
         self.timeout_seconds = timeout_seconds
 
+    @property
+    def timeout(self) -> httpx.Timeout:
+        """Use explicit phase limits so slow public APIs fail predictably."""
+        return httpx.Timeout(connect=min(self.timeout_seconds, 8), read=self.timeout_seconds, write=self.timeout_seconds, pool=min(self.timeout_seconds, 8))
+
     def _cache_path(self, source: str, url: str, params: dict[str, Any] | None) -> Path:
         identity = json.dumps({"url": url, "params": params or {}}, sort_keys=True, default=str)
         digest = hashlib.sha256(identity.encode()).hexdigest()
@@ -42,7 +47,7 @@ class CachedHttpClient:
             cached = json.loads(cache_path.read_text(encoding="utf-8"))
             return cached.get("payload", cached), cache_path, True
         try:
-            response = httpx.get(url, params=params, headers=headers, timeout=self.timeout_seconds)
+            response = httpx.get(url, params=params, headers=headers, timeout=self.timeout)
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
             if 400 <= exc.response.status_code < 500 and exc.response.status_code != 429:
@@ -76,7 +81,7 @@ class CachedHttpClient:
         cache_path = self._cache_path(source, url, None).with_suffix(".txt")
         if cache_path.is_file() and not force:
             return cache_path.read_text(encoding="utf-8"), cache_path, True
-        response = httpx.get(url, headers=headers, timeout=self.timeout_seconds)
+        response = httpx.get(url, headers=headers, timeout=self.timeout)
         response.raise_for_status()
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         cache_path.write_text(response.text, encoding="utf-8")
@@ -95,7 +100,7 @@ class CachedHttpClient:
         if cache_path.is_file() and not force:
             cached = json.loads(cache_path.read_text(encoding="utf-8"))
             return cached.get("payload", cached), cache_path, True
-        response = httpx.post(url, data=data, headers=headers, timeout=self.timeout_seconds)
+        response = httpx.post(url, data=data, headers=headers, timeout=self.timeout)
         response.raise_for_status()
         payload = response.json()
         cache_path.parent.mkdir(parents=True, exist_ok=True)
