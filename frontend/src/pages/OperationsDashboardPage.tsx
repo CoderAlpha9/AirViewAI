@@ -1,8 +1,9 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 
-import { type Horizon, type LivePanel, type Pollutant } from "../api/live";
+import { contextMatches, type Horizon, type LivePanel, type Pollutant } from "../api/live";
 import { getNetworkOverview, type NetworkOverview } from "../api/operations";
 import { CitySearch } from "../components/operations/CitySearch";
+import { AskAirView } from "../components/operations/AskAirView";
 import { LiveForecastChart } from "../components/operations/LiveForecastChart";
 import { RefreshIcon } from "../components/operations/Icons";
 import { EmptyPanel, PanelError, PanelSkeleton } from "../components/operations/PanelStatus";
@@ -86,6 +87,18 @@ export function OperationsDashboardPage() {
   const forecast = forecastState.data;
   const intelligence = intelligenceState.data;
   const stations = useMemo(() => stationState.data?.stations ?? [], [stationState.data]);
+  const copilotContext = Object.values(states)
+    .map((state) => state.context)
+    .find(
+      (context) =>
+        context
+        && contextMatches(context, {
+          cityId: activeCity.cityId,
+          cityName: activeCity.name,
+          pollutant,
+          horizon,
+        }),
+    );
 
   const mapStations = useMemo(
     () =>
@@ -350,6 +363,13 @@ export function OperationsDashboardPage() {
       <footer className="mt-7 border-t border-slate-800 pt-4 text-xs text-slate-500">
         AirView AI · live operational decision support · OpenStreetMap attribution remains visible on the map
       </footer>
+      <AskAirView
+        cityName={activeCity.name}
+        cityId={copilotContext?.city.city_id}
+        pollutant={pollutant}
+        horizon={horizon}
+        snapshotId={copilotContext?.snapshot_id}
+      />
     </div>
   );
 }

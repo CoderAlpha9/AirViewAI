@@ -251,6 +251,37 @@ try {
   };
   const contentConsistencyClean = contentScenarios.every((scenario) => scenario.snapshotAligned && scenario.categoryAligned && scenario.allActionsSignificant && scenario.uniqueActionSources && scenario.uniqueActionCopy && scenario.forbiddenVisibleWording.length === 0);
 
+  await evaluate("document.querySelector('[aria-label=\"Open Ask AirView\"]')?.click(); true");
+  await waitFor("Boolean(document.querySelector('[role=\"dialog\"][aria-label=\"Ask AirView\"]'))");
+  await waitFor("Array.from(document.querySelectorAll('.ask-airview-system')).some((item) => item.textContent.includes('unavailable on this deployment'))");
+  const copilotInitialContext = await evaluate("document.querySelector('.ask-airview-context')?.textContent?.trim()");
+  const copilotUnavailableProfessional = await evaluate("Array.from(document.querySelectorAll('.ask-airview-system')).some((item) => item.textContent.trim() === 'Ask AirView is unavailable on this deployment.')");
+  const copilotKeyLeakage = await evaluate("/GEMINI_API_KEY|AIza[0-9A-Za-z_-]{20,}|x-goog-api-key/i.test(document.querySelector('[role=\"dialog\"]')?.textContent ?? '')");
+  await selectCityByName("Delhi NCR");
+  await selectControl(1, "pm2_5");
+  await selectControl(2, "24");
+  await waitFor("document.querySelector('.ask-airview-context')?.textContent?.includes('Delhi NCR · PM2.5 · Next 24 hours')");
+  await selectControl(2, "48");
+  await waitFor("document.querySelector('.ask-airview-context')?.textContent?.includes('Next 48 hours')");
+  await selectControl(2, "72");
+  await waitFor("document.querySelector('.ask-airview-context')?.textContent?.includes('Next 72 hours')");
+  await selectCityByName("Mysuru");
+  await waitFor("document.querySelector('.ask-airview-context')?.textContent?.includes('Mysuru · PM2.5 · Next 72 hours')");
+  const copilotContextAfterSwitch = await evaluate("document.querySelector('.ask-airview-context')?.textContent?.trim()");
+  const copilotContextMessage = await evaluate("Array.from(document.querySelectorAll('.ask-airview-system')).some((item) => item.textContent.includes('Context updated to Mysuru'))");
+  const copilotDesktop = await command("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
+  await writeFile(join(reportDirectory, "ask-airview-desktop.png"), Buffer.from(copilotDesktop.data, "base64"));
+  await command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await delay(250);
+  const copilotMobileLayout = await evaluate("getComputedStyle(document.querySelector('.ask-airview-panel')).width === '390px' && document.documentElement.scrollWidth === document.documentElement.clientWidth");
+  const copilotMobile = await command("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
+  await writeFile(join(reportDirectory, "ask-airview-mobile.png"), Buffer.from(copilotMobile.data, "base64"));
+  await command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  await command("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape" });
+  await command("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape" });
+  await waitFor("!document.querySelector('[role=\"dialog\"][aria-label=\"Ask AirView\"]')");
+  const copilotEscapeClosed = await evaluate("!document.querySelector('[role=\"dialog\"][aria-label=\"Ask AirView\"]')");
+
   const categoryLegendLabels = await evaluate("Array.from(document.querySelectorAll('[aria-label=\"Current air-quality category colour legend\"] span')).map((item) => item.textContent.trim()).filter((value) => ['Good', 'Satisfactory', 'Moderate', 'Poor', 'Very Poor', 'Severe'].includes(value))");
   const gridFillColours = await evaluate("Array.from(new Set(Array.from(document.querySelectorAll('.leaflet-overlay-pane path[fill]')).map((item) => item.getAttribute('fill')).filter((value) => value && value !== 'none')))");
   await evaluate("document.querySelector('.leaflet-container').scrollIntoView({ block: 'center' }); true");
@@ -271,7 +302,7 @@ try {
   const distinctSequenceSnapshots = new Set(citySnapshots).size;
   const mapLayersClean = [...mapLayerCounts, rapidSwitchFinalMap].every((item) => item.activeGridMatchesMetadata && item.cityIdMatchesFrame && item.cityNameMatches);
   const result = {
-    status: consoleErrors.length || failedRequests.length || mobileOverflow || distinctSequenceSnapshots !== 4 || !mapLayersClean || categoryLegendLabels.length !== 6 || gridFillColours.length === 0 || !contentConsistencyClean || !Object.values(sourceScoreBandsCovered).every(Boolean) ? "failed" : "passed",
+    status: consoleErrors.length || failedRequests.length || mobileOverflow || distinctSequenceSnapshots !== 4 || !mapLayersClean || categoryLegendLabels.length !== 6 || gridFillColours.length === 0 || !contentConsistencyClean || !Object.values(sourceScoreBandsCovered).every(Boolean) || !copilotUnavailableProfessional || copilotKeyLeakage || !copilotContextMessage || !copilotMobileLayout || !copilotEscapeClosed ? "failed" : "passed",
     progressiveSkeletonObserved,
     testedCitySequence,
     rapidSwitchSequence,
@@ -289,6 +320,15 @@ try {
     contentScenarios,
     sourceScoreBandsCovered,
     contentConsistencyClean,
+    copilot: {
+      initialContext: copilotInitialContext,
+      contextAfterSwitch: copilotContextAfterSwitch,
+      unavailableProfessional: copilotUnavailableProfessional,
+      keyLeakage: copilotKeyLeakage,
+      contextMessage: copilotContextMessage,
+      mobileLayout: copilotMobileLayout,
+      escapeClosed: copilotEscapeClosed,
+    },
     mobileOverflow,
     consoleErrors,
     failedRequests,

@@ -10,6 +10,7 @@ The five quick-select cities are Delhi NCR, Agra, Amritsar, Lucknow and Ludhiana
 - **FastAPI:** resolves cities, calls providers concurrently, assembles canonical snapshots and serves independent live panels.
 - **ML service:** loads persisted pollutant/horizon artifacts and transfers only validation-selected persistence-trained corrections onto live CAMS trajectories and grid cells.
 - **Leaflet:** fits the resolved city boundary, grid and stations; it renders GeoJSON cells as a single layer for responsive interaction.
+- **Ask AirView:** resolves the selected canonical snapshot on the server and sends a bounded, read-only context to Gemini for concise dashboard guidance.
 
 Every panel context includes city, pollutant, horizon, issue time, snapshot ID, freshness and coverage type. Successful panels remain visible if an unrelated provider fails.
 
@@ -67,7 +68,20 @@ Provider credentials are optional. Leave unused values blank. `backend/.env` is 
 | `OPENAQ_API_KEY` | blank | Optional OpenAQ v3 access |
 | `NASA_FIRMS_MAP_KEY` | blank | Optional FIRMS access |
 | `COPERNICUS_CLIENT_ID/SECRET` | blank | Offline ingestion utilities; not required by the dashboard |
+| `GEMINI_API_KEY` | blank | Optional backend-only credential for Ask AirView |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini model used for structured copilot answers |
+| `AIRVIEW_COPILOT_ENABLED` | `true` | Set to `false` to disable copilot requests |
+| `AIRVIEW_COPILOT_TIMEOUT_SECONDS` | `20` | Gemini request timeout |
+| `AIRVIEW_COPILOT_RATE_LIMIT_PER_MINUTE` | `12` | Per-client/session copilot request limit |
 | `VITE_API_BASE_URL` | `http://127.0.0.1:8000/api` | Frontend API origin |
+
+### Ask AirView
+
+Set `GEMINI_API_KEY` in `backend/.env` or the repository `.env`, restart the backend, and open **Ask AirView** from the lower-right dashboard button. The key must never use a `VITE_` variable. Without a key, the dashboard remains fully operational and the copilot reports an unavailable state.
+
+`POST /api/copilot/chat` accepts a question plus city, pollutant, horizon, snapshot and session identifiers. The backend retrieves the exact server-held canonical snapshot; stale or mismatched IDs are rejected before Gemini is called. Only bounded current conditions, sampled forecast trajectory, stations, provider freshness, map/hotspot summary, source evidence, actions and advisory are supplied. Responses are validated JSON and the chat is read-only—it cannot change forecasts, data or interventions.
+
+`GET /api/copilot/status` exposes only enabled/configured state, provider and model. See [docs/COPILOT.md](docs/COPILOT.md) for the context and security contracts.
 
 ## Run from the repository root
 

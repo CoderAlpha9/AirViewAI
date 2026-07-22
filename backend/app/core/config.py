@@ -43,6 +43,18 @@ class Settings(BaseSettings):
     )
     live_provider_timeout_seconds: int = 20
     operational_cache_seconds: int = 600
+    gemini_api_key: str | None = Field(
+        default=None, validation_alias=AliasChoices("GEMINI_API_KEY", "AIRVIEW_GEMINI_API_KEY")
+    )
+    gemini_model: str = Field(
+        default="gemini-2.5-flash",
+        validation_alias=AliasChoices("GEMINI_MODEL", "AIRVIEW_GEMINI_MODEL"),
+    )
+    copilot_enabled: bool = True
+    copilot_timeout_seconds: int = 20
+    copilot_max_output_tokens: int = 700
+    copilot_max_input_chars: int = 14000
+    copilot_rate_limit_per_minute: int = 12
 
     model_config = SettingsConfigDict(
         env_file=(_BACKEND_DIR / ".env", _BACKEND_DIR.parent / ".env"),

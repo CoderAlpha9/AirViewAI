@@ -50,6 +50,9 @@ function Test-HtmlEndpoint {
 
 $Api = "http://127.0.0.1:$BackendPort/api"
 $null = Test-JsonEndpoint "backend-health" "$Api/health" { param($p) $p.status -eq "ok" }
+$null = Test-JsonEndpoint "copilot-status" "$Api/copilot/status" {
+    param($p) $p.provider -eq "Google Gemini" -and $p.model -and $null -ne $p.enabled -and $null -ne $p.configured
+}
 $null = Test-JsonEndpoint "operations-status" "$Api/operations/status" { param($p) $p.status -eq "ready" }
 $null = Test-JsonEndpoint "operational-city-registry" "$Api/operations/cities" { param($p) $p.count -eq 5 }
 $Network = Test-JsonEndpoint "five-city-outlook" "$Api/operations/network" {

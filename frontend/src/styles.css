@@ -90,6 +90,44 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 .advisory-list { display: grid; gap: 8px; margin-top: 13px; color: #cbd5e1; font-size: .82rem; line-height: 1.5; }
 .advisory-list li { position: relative; padding-left: 16px; }
 .advisory-list li::before { position: absolute; left: 0; top: .55em; width: 5px; height: 5px; border-radius: 50%; background: #2dd4bf; content: ""; }
+.ask-airview-shell { position: fixed; right: 22px; bottom: 20px; z-index: 1200; }
+.ask-airview-launcher { display: inline-flex; min-height: 44px; align-items: center; gap: 8px; border: 1px solid #3a5b5d; border-radius: 8px; padding: 0 15px; color: #effcf9; background: #163335; font-size: .84rem; font-weight: 700; cursor: pointer; }
+.ask-airview-launcher:hover { background: #1b4142; }
+.ask-airview-launcher span { display: grid; width: 20px; height: 20px; place-items: center; border: 1px solid #5f8586; border-radius: 50%; color: #99f6e4; font-size: .72rem; }
+.ask-airview-panel { display: flex; width: 380px; height: min(520px, calc(100vh - 40px)); overflow: hidden; border: 1px solid #33464c; border-radius: 11px; background: #111a1e; flex-direction: column; box-shadow: 0 12px 30px rgba(0, 0, 0, .28); }
+.ask-airview-header { display: flex; min-height: 58px; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #26343a; padding: 11px 13px; }
+.ask-airview-header > div:first-child { display: grid; min-width: 0; gap: 2px; }
+.ask-airview-header strong { color: #f1f5f9; font-size: .94rem; }
+.ask-airview-header span { color: #829196; font-size: .66rem; }
+.ask-airview-header-actions { display: flex; align-items: center; gap: 5px; }
+.ask-airview-header-actions button { min-height: 30px; border: 1px solid #304349; border-radius: 6px; padding: 0 8px; color: #b9c5c8; background: #0c1418; font-size: .7rem; cursor: pointer; }
+.ask-airview-header-actions button:last-child { width: 30px; padding: 0; font-size: 1.15rem; }
+.ask-airview-context { overflow: hidden; border-bottom: 1px solid #26343a; padding: 8px 13px; color: #99f6e4; background: #102326; font-size: .7rem; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.ask-airview-conversation { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; padding: 12px; scrollbar-width: thin; }
+.ask-airview-intro { padding: 4px 2px 9px; }
+.ask-airview-intro strong { color: #dce8e8; font-size: .8rem; }
+.ask-airview-intro p { margin-top: 4px; color: #829196; font-size: .72rem; line-height: 1.45; }
+.ask-airview-message { max-width: 92%; margin-bottom: 10px; overflow-wrap: anywhere; border-radius: 8px; padding: 9px 10px; font-size: .76rem; line-height: 1.5; }
+.ask-airview-user { margin-left: auto; color: #e5eeee; background: #1a383b; }
+.ask-airview-assistant { border: 1px solid #293a40; color: #cbd5d8; background: #0c1418; }
+.ask-airview-data-status { display: inline-flex; margin-top: 8px; border: 1px solid #315054; border-radius: 999px; padding: 2px 7px; color: #a7f3d0; font-size: .6rem; font-weight: 700; text-transform: capitalize; }
+.ask-airview-evidence { margin-top: 9px; }
+.ask-airview-evidence strong, .ask-airview-assistant summary { color: #aebcc0; font-size: .67rem; font-weight: 700; }
+.ask-airview-evidence ul, .ask-airview-assistant details ul { display: grid; gap: 4px; margin-top: 5px; padding-left: 15px; color: #93a3a8; font-size: .69rem; }
+.ask-airview-assistant details { margin-top: 8px; }
+.ask-airview-assistant summary { cursor: pointer; }
+.ask-airview-followups { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+.ask-airview-followups button, .ask-airview-suggestions button { border: 1px solid #315054; border-radius: 6px; padding: 5px 7px; color: #a7d9d3; background: #102023; font-size: .65rem; line-height: 1.25; text-align: left; cursor: pointer; }
+.ask-airview-system { margin: 8px 0; border-radius: 6px; padding: 6px 8px; color: #89999d; background: #0c1418; font-size: .66rem; text-align: center; }
+.ask-airview-loading { margin-bottom: 8px; color: #a7b7ba; font-size: .72rem; }
+.ask-airview-error { display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid #654d35; border-radius: 7px; padding: 8px; color: #fcd9a4; background: #251c14; font-size: .69rem; }
+.ask-airview-error button { flex-shrink: 0; border: 0; padding: 3px; color: #fdba74; background: transparent; font-weight: 700; cursor: pointer; }
+.ask-airview-suggestions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; border-top: 1px solid #26343a; padding: 9px 11px; }
+.ask-airview-composer { display: flex; align-items: flex-end; gap: 7px; border-top: 1px solid #26343a; padding: 9px 10px 6px; }
+.ask-airview-composer textarea { min-height: 44px; max-height: 90px; min-width: 0; flex: 1; resize: vertical; border: 1px solid #34494f; border-radius: 7px; padding: 8px 9px; color: #edf4f4; background: #0c1418; font-size: .75rem; line-height: 1.4; }
+.ask-airview-composer button { height: 38px; border: 1px solid #3f6868; border-radius: 7px; padding: 0 11px; color: #e6fffa; background: #174344; font-size: .72rem; font-weight: 700; cursor: pointer; }
+.ask-airview-composer button:disabled, .ask-airview-suggestions button:disabled { cursor: not-allowed; opacity: .48; }
+.ask-airview-readonly { padding: 0 10px 7px; color: #65767b; font-size: .58rem; text-align: center; }
 .legend-dot { margin-right: 7px; display: inline-block; height: 9px; width: 9px; border-radius: 50%; }
 .city-search { position: relative; z-index: 900; border: 1px solid #26343a; border-radius: 10px; background: #111a1e; padding: 12px 14px; }
 .city-search form > label { display: block; margin-bottom: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; color: #94a3b8; }
@@ -104,6 +142,10 @@ table td { border-bottom: 1px solid #26343a; padding: 11px 12px; color: #cbd5e1;
 table td:first-child span { display: block; margin-top: 2px; font-size: 10px; color: #64748b; }
 
 @media (max-width: 640px) {
+  .ask-airview-shell { right: 0; bottom: 0; left: 0; }
+  .ask-airview-launcher { position: absolute; right: 14px; bottom: 14px; }
+  .ask-airview-panel { width: 100%; height: min(82vh, 620px); border-right: 0; border-bottom: 0; border-left: 0; border-radius: 13px 13px 0 0; }
+  .ask-airview-suggestions { grid-template-columns: 1fr; }
   .control-bar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .control-bar label { min-width: 0; }
   .refresh-button { width: 100%; min-width: 0; justify-content: center; overflow: hidden; white-space: nowrap; }

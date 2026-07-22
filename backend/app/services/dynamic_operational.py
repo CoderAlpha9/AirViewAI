@@ -21,6 +21,7 @@ from app.services.city_support import (
     generate_city_grid,
     resolve_indian_city,
 )
+from app.services.copilot_snapshots import remember_snapshot
 from app.services.decision import (
     AQI_COLOURS,
     aqi_result,
@@ -488,11 +489,13 @@ async def build_dynamic_snapshot(
     )
     cached = await cache.get(cache_key)
     if cached is not None:
+        remember_snapshot(cached)
         return cached
     lock = _snapshot_locks.setdefault(cache_key, asyncio.Lock())
     async with lock:
         cached = await cache.get(cache_key)
         if cached is not None:
+            remember_snapshot(cached)
             return cached
         return await _build_dynamic_snapshot(query, pollutant, horizon, max_cells, include_sources)
 
@@ -827,4 +830,5 @@ async def _build_dynamic_snapshot(
         "provider_status": provider_status,
     }
     await cache.set(cache_key, response, 300)
+    remember_snapshot(response)
     return response
