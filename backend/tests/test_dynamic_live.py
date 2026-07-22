@@ -152,6 +152,27 @@ def test_canonical_aqi_and_priority_are_consistent() -> None:
     assert intervention_priority(result["aqi"], 0.8) != "Unavailable"
 
 
+def test_source_screening_and_actions_cover_zero_medium_and_high_evidence() -> None:
+    sources = dynamic_operational._source_screening(
+        weather={"wind_speed_10m": 0, "boundary_layer_height": 100},
+        firms=[],
+        osm={"road_count": 1000, "industrial_count": 0, "construction_count": 0},
+        coverage_type="model_based",
+    )
+    strengths = {item["evidence_strength"] for item in sources}
+    assert {"None", "Moderate", "Very high"}.issubset(strengths)
+    assert next(item for item in sources if item["source_id"] == "thermal")["score"] == 0
+    actions = dynamic_operational._action_queue(sources, "Elevated")
+    assert actions
+    assert all(item["evidence_score"] >= 25 for item in actions)
+    assert len({item["source_id"] for item in actions}) == len(actions)
+    assert len({item["title"] for item in actions}) == len(actions)
+    assert not any(item["source_id"] == "thermal" for item in actions)
+    meteorology = next(item for item in actions if item["source_id"] == "meteorology")
+    assert "enforcement" not in meteorology["action"].lower()
+    assert "sensitivity" not in str(actions).lower()
+
+
 @pytest.mark.parametrize("city_id", ["delhi-ncr", "agra", "amritsar", "lucknow", "ludhiana"])
 async def test_all_five_pilot_cities_resolve_without_network(city_id: str) -> None:
     resolved = await dynamic_operational.resolve_city_reference(city_id)
@@ -253,7 +274,12 @@ async def test_dynamic_snapshot_supports_five_cities_pollutants_and_horizons(
     assert payload["context"]["city"]["city_id"] == city_id
     assert len(payload["forecast"]["points"]) == horizon
     assert payload["current"]["provider"] == "CAMS via Open-Meteo"
-    assert payload["advisory"]["category"] == payload["current"]["category"]
+    assert payload["advisory"]["category"] == payload["forecast"]["peak"]["category"]
+    assert payload["advisory"]["colour"] == payload["forecast"]["peak"]["colour"]
+    assert payload["advisory"]["aqi"] == payload["forecast"]["peak"]["aqi"]
+    assert payload["advisory"]["peak_value"] == payload["forecast"]["peak"]["value"]
+    assert payload["advisory"]["pollutant"] == pollutant
+    assert payload["advisory"]["horizon"] == horizon
     assert payload["current"]["colour"] == AQI_COLOURS[payload["current"]["category"]]
     assert (
         payload["forecast"]["peak"]["colour"]
@@ -264,11 +290,18 @@ async def test_dynamic_snapshot_supports_five_cities_pollutants_and_horizons(
         for point in payload["forecast"]["points"]
         if point["category"] is not None
     )
-    assert all(
-        action["priority"] == payload["intelligence"]["priority"] for action in payload["actions"]
-    )
     assert payload["forecast"]["priority"] == intervention_priority(
         payload["forecast"]["peak"]["aqi"], payload["intelligence"]["confidence"]
+    )
+    assert payload["intelligence"]["priority"] == payload["forecast"]["priority"]
+    assert payload["intelligence"]["forecast_category"] == payload["forecast"]["peak"]["category"]
+    assert all(action["evidence_score"] >= 25 for action in payload["actions"])
+    assert len({action["source_id"] for action in payload["actions"]}) == len(payload["actions"])
+    assert not any(
+        action["source_id"] == source["source_id"]
+        for source in payload["intelligence"]["sources"]
+        if source["score"] in {0, None}
+        for action in payload["actions"]
     )
     assert all(
         item["properties"]["coverage_type"] == "model_based" for item in payload["map"]["features"]

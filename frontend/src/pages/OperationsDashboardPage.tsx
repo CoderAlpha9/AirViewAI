@@ -98,6 +98,41 @@ export function OperationsDashboardPage() {
     mapState.context && currentState.context?.snapshot_id === mapState.context.snapshot_id
       ? current
       : undefined;
+  const forecastSnapshot = forecastState.context?.snapshot_id;
+  const sourceMatchesForecast = Boolean(
+    forecastSnapshot
+      && intelligenceState.context?.snapshot_id === forecastSnapshot
+      && (
+        forecast?.peak
+          ? intelligence?.forecast_category === forecast.peak.category
+            && intelligence?.forecast_colour === forecast.peak.colour
+            && intelligence?.forecast_aqi === forecast.peak.aqi
+            && intelligence?.peak_value === forecast.peak.value
+          : forecast?.status === "unavailable"
+            && intelligence?.forecast_category == null
+            && intelligence?.forecast_colour == null
+            && intelligence?.forecast_aqi == null
+            && intelligence?.peak_value == null
+      ),
+  );
+  const actionsMatchForecast = Boolean(
+    forecastSnapshot && actionState.context?.snapshot_id === forecastSnapshot,
+  );
+  const advisoryMatchesForecast = Boolean(
+    forecastSnapshot
+      && advisoryState.context?.snapshot_id === forecastSnapshot
+      && (
+        forecast?.peak
+          ? advisoryState.data?.pollutant === pollutant
+            && advisoryState.data?.horizon === horizon
+            && advisoryState.data?.category === forecast.peak.category
+            && advisoryState.data?.colour === forecast.peak.colour
+            && advisoryState.data?.aqi === forecast.peak.aqi
+            && advisoryState.data?.peak_value === forecast.peak.value
+          : forecast?.status === "unavailable"
+            && advisoryState.data?.status === "unavailable"
+      ),
+  );
 
   const chooseCity = (city: ActiveCity) => {
     setCityOptions((options) =>
@@ -176,32 +211,32 @@ export function OperationsDashboardPage() {
           {currentState.status === "loading" && !current ? <PanelSkeleton height="h-20" /> : current ? (
             <>
               <p className="metric-value" style={{ color: current.colour ?? undefined }}>{current.value.toFixed(1)} <span>µg/m³</span></p>
-              <p className="metric-detail">{current.category ?? "Unclassified"}{current.aqi != null ? ` · AQI ${current.aqi}` : ""}</p>
+              <p className="metric-detail">{current.category ?? "Category unavailable"}{current.aqi != null ? ` · AQI ${current.aqi}` : ""}</p>
               <p className="metric-meta" title={current.station_name ?? current.provider}>{current.station_name ?? current.provider} · {current.freshness.label}</p>
             </>
           ) : <PanelError message={currentState.error ?? "Current conditions unavailable."} onRetry={() => retry("current")} />}
         </article>
 
-        <article className="metric-card" data-testid="forecast-card">
+        <article className="metric-card" data-category={forecast?.peak?.category ?? undefined} data-snapshot-id={forecastState.context?.snapshot_id} data-testid="forecast-card">
           <p className="metric-label">{horizon}h forecast peak</p>
           {forecastState.status === "loading" && !forecast ? <PanelSkeleton height="h-20" /> : forecast?.peak ? (
             <>
-              <p className="metric-value">{forecast.peak.value.toFixed(1)} <span>µg/m³</span></p>
-              <p className="metric-detail">{forecast.peak.aqi != null ? `Forecast AQI ${forecast.peak.aqi}` : "Forecast AQI unavailable"}</p>
+              <p className="metric-value" style={{ color: forecast.peak.colour ?? undefined }}>{forecast.peak.value.toFixed(1)} <span>µg/m³</span></p>
+              <p className="metric-detail" style={{ color: forecast.peak.colour ?? undefined }}>{forecast.peak.category}{forecast.peak.aqi != null ? ` · forecast AQI ${forecast.peak.aqi}` : ""}</p>
               <p className="metric-meta">Peak near {localDate(forecast.peak.timestamp_utc)}</p>
             </>
           ) : <PanelError message={forecastState.error ?? "Forecast unavailable."} onRetry={() => retry("forecast")} />}
         </article>
 
         <article className="metric-card" data-testid="priority-card">
-          <p className="metric-label">Current intervention priority</p>
-          {intelligenceState.status === "loading" && !intelligence ? <PanelSkeleton height="h-20" /> : intelligence ? (
+          <p className="metric-label">Forecast intervention priority</p>
+          {(intelligenceState.status === "loading" || forecastState.status === "loading") && !sourceMatchesForecast ? <PanelSkeleton height="h-20" /> : intelligence && sourceMatchesForecast ? (
             <>
               <p className="metric-value">{intelligence.priority}</p>
               <p className="metric-detail">{Math.round(intelligence.confidence * 100)}% evidence confidence</p>
-              <p className="metric-meta">{intelligence.firms_count} current thermal anomalies</p>
+              <p className="metric-meta">{intelligence.forecast_category} forecast · {horizon}-hour window</p>
             </>
-          ) : <PanelError message={intelligenceState.error ?? "Priority unavailable."} onRetry={() => retry("source-intelligence")} />}
+          ) : <PanelError message={intelligenceState.error ?? "Priority is not aligned with the selected forecast."} onRetry={() => retry("source-intelligence")} />}
         </article>
 
         <article className="metric-card" data-testid="coverage-card">
@@ -222,17 +257,23 @@ export function OperationsDashboardPage() {
             <LiveForecastChart forecast={forecast} context={forecastState.context} />
           ) : <PanelError message={forecastState.error ?? "Forecast data is unavailable."} onRetry={() => retry("forecast")} />}
         </Section>
-        <Section title="Source context" eyebrow="Evidence" action={intelligenceState.status === "error" ? retryButton("source-intelligence", retry) : undefined}>
-          {intelligenceState.status === "loading" && !intelligence ? <PanelSkeleton height="h-64" /> : intelligence ? (
-            <div className="space-y-3">
-              <div className="evidence-row"><span>Relative evidence strength</span><strong>{intelligence.confidence >= 0.75 ? "High" : intelligence.confidence >= 0.5 ? "Moderate" : "Limited"}</strong></div>
-              <div className="evidence-row"><span>Thermal anomalies</span><strong>{intelligence.firms_count}</strong></div>
-              <div className="evidence-row"><span>Road context</span><strong>{Number(intelligence.osm.road_count ?? 0).toLocaleString("en-IN")}</strong></div>
-              <div className="evidence-row"><span>Industrial features</span><strong>{Number(intelligence.osm.industrial_count ?? 0).toLocaleString("en-IN")}</strong></div>
-              <div className="evidence-row"><span>Construction features</span><strong>{Number(intelligence.osm.construction_count ?? 0).toLocaleString("en-IN")}</strong></div>
-              <details className="method-details"><summary>How to read this</summary><p>Context indicators support field prioritisation. They are not emission shares or regulatory source attribution.</p></details>
+        <Section title="Likely contributing context" eyebrow="Source screening" action={intelligenceState.status === "error" ? retryButton("source-intelligence", retry) : undefined}>
+          {(intelligenceState.status === "loading" || forecastState.status === "loading") && !sourceMatchesForecast ? <PanelSkeleton height="h-64" /> : intelligence && sourceMatchesForecast ? (
+            <div className="space-y-3" data-snapshot-id={intelligenceState.context?.snapshot_id} data-testid="source-screening">
+              {intelligence.sources.map((source) => (
+                <article className="source-evidence" data-evidence-strength={source.evidence_strength} data-score={source.score ?? "unavailable"} key={source.source_id}>
+                  <div className="source-evidence-heading">
+                    <strong>{source.label}</strong>
+                    <span>{source.evidence_strength}</span>
+                  </div>
+                  <p className="source-score">{source.score == null ? "Evidence score unavailable" : `Relative evidence score: ${source.score}/100`}</p>
+                  {source.score != null && <div className="source-track" aria-label={`${source.label}: ${source.score} out of 100`}><span style={{ width: `${source.score}%` }} /></div>}
+                  <p className="source-description">{source.description}</p>
+                </article>
+              ))}
+              <details className="method-details"><summary>About these scores</summary><p>Relative operational evidence only; not pollution shares or confirmed source attribution.</p></details>
             </div>
-          ) : <PanelError message={intelligenceState.error ?? "Source context unavailable."} onRetry={() => retry("source-intelligence")} />}
+          ) : <PanelError message={intelligenceState.error ?? "Source evidence is not aligned with the selected forecast."} onRetry={() => retry("source-intelligence")} />}
         </Section>
       </div>
 
@@ -263,19 +304,23 @@ export function OperationsDashboardPage() {
             ) : <PanelError message={stationState.error ?? "Stations unavailable."} onRetry={() => retry("stations")} />}
           </Section>
 
-          <Section title="Recommended intervention" eyebrow="Field action">
-            {actionState.status === "loading" && !actionState.data ? <PanelSkeleton height="h-36" /> : actionState.data?.length ? (
-              <div className="space-y-3">{actionState.data.map((action, index) => <article className="action-card" key={`${action.action}-${index}`}><span>{action.priority}</span><p>{action.action}</p></article>)}</div>
-            ) : actionState.status === "error" ? <PanelError message={actionState.error} onRetry={() => retry("actions")} /> : <EmptyPanel>No intervention is available for the current evidence.</EmptyPanel>}
+          <Section title="Recommended action queue" eyebrow="Operational response">
+            <div data-snapshot-id={actionState.context?.snapshot_id} data-testid="action-queue-panel">
+              {(actionState.status === "loading" || forecastState.status === "loading") && !actionsMatchForecast ? <PanelSkeleton height="h-36" /> : actionState.data?.length && actionsMatchForecast ? (
+                <div className="space-y-3" data-testid="recommended-actions">{actionState.data.map((action) => <article className="action-card" data-evidence-score={action.evidence_score} data-source-id={action.source_id} key={action.source_id}><div className="action-heading"><span>{action.priority} priority</span><strong>{action.title}</strong></div><p className="action-source">{action.source_label}</p><p>{action.action}</p><dl className="action-meta"><div><dt>Timeframe</dt><dd>{action.recommended_timeframe}</dd></div><div><dt>Effort</dt><dd>{action.operational_effort}</dd></div><div><dt>Evidence</dt><dd>{action.evidence_strength}</dd></div></dl></article>)}</div>
+              ) : actionState.status === "error" ? <PanelError message={actionState.error} onRetry={() => retry("actions")} /> : !actionsMatchForecast ? <PanelError message="Actions are not aligned with the selected forecast." onRetry={() => retry("actions")} /> : <EmptyPanel>No source evidence currently warrants an operational action.</EmptyPanel>}
+            </div>
           </Section>
         </div>
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
         <Section title="Citizen advisory" eyebrow="Public information">
-          {advisoryState.status === "loading" && !advisoryState.data ? <PanelSkeleton height="h-32" /> : advisoryState.data?.status === "available" ? (
-            <div><p className="text-lg font-semibold text-slate-100">Current category: {advisoryState.data.category ?? "Unclassified"}</p><p className="mt-2 text-sm leading-6 text-slate-300">{advisoryState.data.message}</p><p className="mt-4 text-xs text-slate-500">Public information only. Follow local authority and healthcare guidance.</p></div>
-          ) : advisoryState.status === "error" ? <PanelError message={advisoryState.error} onRetry={() => retry("advisory")} /> : <EmptyPanel>Advisory unavailable until current conditions are established.</EmptyPanel>}
+          <div data-snapshot-id={advisoryState.context?.snapshot_id} data-status={advisoryState.data?.status} data-testid="citizen-advisory-panel">
+            {(advisoryState.status === "loading" || forecastState.status === "loading") && !advisoryMatchesForecast ? <PanelSkeleton height="h-32" /> : advisoryState.data?.status === "available" && advisoryMatchesForecast ? (
+              <div data-category={advisoryState.data.category} data-colour={advisoryState.data.colour ?? undefined} data-snapshot-id={advisoryState.context?.snapshot_id} data-testid="citizen-advisory"><p className="text-lg font-semibold" style={{ color: advisoryState.data.colour ?? undefined }}>{advisoryState.data.headline}</p><p className="mt-2 text-sm text-slate-300">{pollutantLabel(pollutant)} may peak near {advisoryState.data.peak_value?.toFixed(1)} µg/m³ around {localDate(advisoryState.data.peak_timestamp_utc)}.</p><ul className="advisory-list">{advisoryState.data.advice?.map((item) => <li key={item}>{item}</li>)}</ul><details className="method-details mt-3"><summary>Guidance note</summary><p>{advisoryState.data.qualification}</p></details></div>
+            ) : advisoryState.status === "error" ? <PanelError message={advisoryState.error} onRetry={() => retry("advisory")} /> : !advisoryMatchesForecast && advisoryState.data?.status === "available" ? <PanelError message="Advisory is not aligned with the selected forecast." onRetry={() => retry("advisory")} /> : <EmptyPanel>Forecast advisory is unavailable for this context.</EmptyPanel>}
+          </div>
         </Section>
 
         <Section title="Snapshot integrity" eyebrow="Data status">

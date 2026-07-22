@@ -48,6 +48,245 @@ def _finite(value: Any) -> float | None:
         return None
 
 
+def _evidence_strength(score: int | None) -> str:
+    if score is None:
+        return "Unavailable"
+    if score == 0:
+        return "None"
+    if score < 25:
+        return "Low"
+    if score < 50:
+        return "Moderate"
+    if score < 75:
+        return "High"
+    return "Very high"
+
+
+def _saturating_score(value: float | None, midpoint: float) -> int | None:
+    if value is None:
+        return None
+    safe = max(0.0, value)
+    return round(100 * safe / (safe + midpoint)) if safe else 0
+
+
+def _source_screening(
+    *,
+    weather: dict[str, Any],
+    firms: list[dict[str, Any]],
+    osm: dict[str, Any],
+    coverage_type: str,
+) -> list[dict[str, Any]]:
+    """Build relative operational evidence scores, never emission shares."""
+    wind = _finite(weather.get("wind_speed_10m"))
+    boundary_layer = _finite(weather.get("boundary_layer_height"))
+    dispersion_parts: list[tuple[float, float]] = []
+    if wind is not None:
+        dispersion_parts.append((max(0.0, min(1.0, (4.0 - wind) / 4.0)), 0.6))
+    if boundary_layer is not None:
+        dispersion_parts.append((max(0.0, min(1.0, (800.0 - boundary_layer) / 700.0)), 0.4))
+    meteorology_score = (
+        round(
+            100
+            * sum(value * weight for value, weight in dispersion_parts)
+            / sum(weight for _, weight in dispersion_parts)
+        )
+        if dispersion_parts
+        else None
+    )
+
+    firms_count = len(firms)
+    firms_frp = sum(_finite(item.get("fire_radiative_power")) or 0.0 for item in firms)
+    thermal_score = min(100, round(28 * firms_count + min(firms_frp / 4, 35)))
+    road_score = _saturating_score(_finite(osm.get("road_count")), 1500)
+    industrial_score = _saturating_score(_finite(osm.get("industrial_count")), 20)
+    construction_score = _saturating_score(_finite(osm.get("construction_count")), 15)
+    local_scores = [
+        value
+        for value in (thermal_score, road_score, industrial_score, construction_score)
+        if value is not None
+    ]
+    strongest_local = max(local_scores, default=0)
+    background_score = min(
+        100,
+        (45 if coverage_type == "model_based" else 25)
+        + (20 if strongest_local < 25 else 0)
+        + (10 if (meteorology_score or 0) >= 75 else 0),
+    )
+
+    raw_sources = [
+        (
+            "meteorology",
+            "Meteorological accumulation",
+            meteorology_score,
+            "Low dispersion may allow pollution to build up."
+            if (meteorology_score or 0) >= 50
+            else "Current weather supports at least some dispersion."
+            if meteorology_score is not None
+            else "Dispersion evidence is unavailable.",
+        ),
+        (
+            "thermal",
+            "Thermal anomaly influence",
+            thermal_score,
+            "Recent thermal anomalies warrant location checks."
+            if thermal_score
+            else "No recent thermal anomalies were returned.",
+        ),
+        (
+            "road",
+            "Road and traffic influence",
+            road_score,
+            "Road density supports traffic and road-dust screening."
+            if road_score
+            else "No material road evidence was returned.",
+        ),
+        (
+            "industrial",
+            "Industrial influence",
+            industrial_score,
+            "Nearby industrial features support targeted compliance review."
+            if industrial_score
+            else "No material industrial evidence was returned.",
+        ),
+        (
+            "construction",
+            "Construction influence",
+            construction_score,
+            "Nearby construction features support dust-control checks."
+            if construction_score
+            else "No material construction evidence was returned.",
+        ),
+        (
+            "background",
+            "Regional or background pollution",
+            background_score,
+            "Regional review is useful where local source evidence is limited.",
+        ),
+    ]
+    return [
+        {
+            "source_id": source_id,
+            "label": label,
+            "score": score,
+            "evidence_strength": _evidence_strength(score),
+            "description": description,
+            "significant": score is not None and score >= 25,
+        }
+        for source_id, label, score, description in raw_sources
+    ]
+
+
+_ACTION_TEMPLATES = {
+    "meteorology": {
+        "title": "Activate stagnant-period safeguards",
+        "action": "Reduce peak-hour exposure and intensify road-dust suppression; time traffic or construction controls for low-dispersion periods.",
+        "effort": "Medium",
+    },
+    "thermal": {
+        "title": "Verify possible open burning",
+        "action": "Inspect likely thermal-anomaly locations and coordinate field verification before any enforcement response.",
+        "effort": "Medium",
+    },
+    "road": {
+        "title": "Reduce traffic and road-dust exposure",
+        "action": "Target congestion enforcement, traffic diversion and road-dust suppression in the highest forecast cells.",
+        "effort": "High",
+    },
+    "industrial": {
+        "title": "Review industrial compliance",
+        "action": "Prioritise compliance inspection of nearby industrial facilities using current field evidence.",
+        "effort": "Medium",
+    },
+    "construction": {
+        "title": "Inspect construction dust controls",
+        "action": "Check uncovered material, debris handling and on-site dust-control compliance.",
+        "effort": "Low",
+    },
+    "background": {
+        "title": "Coordinate regional monitoring review",
+        "action": "Review neighbouring monitoring trends and coordinate with regional agencies where local evidence is limited.",
+        "effort": "Low",
+    },
+}
+
+
+def _action_queue(sources: list[dict[str, Any]], forecast_priority: str) -> list[dict[str, Any]]:
+    if forecast_priority == "Unavailable":
+        return []
+    actions = []
+    for source in sorted(
+        (item for item in sources if item["significant"]),
+        key=lambda item: int(item["score"]),
+        reverse=True,
+    )[:4]:
+        score = int(source["score"])
+        if score >= 75 and forecast_priority in {"Elevated", "High", "Critical"}:
+            priority = "High"
+        elif score >= 50:
+            priority = "Medium"
+        else:
+            priority = "Routine"
+        timeframe = (
+            "Immediate"
+            if forecast_priority in {"High", "Critical"}
+            else "Within 12 hours"
+            if forecast_priority == "Elevated"
+            else "Within 24 hours"
+        )
+        template = _ACTION_TEMPLATES[source["source_id"]]
+        actions.append(
+            {
+                "source_id": source["source_id"],
+                "source_label": source["label"],
+                "title": template["title"],
+                "action": template["action"],
+                "priority": priority,
+                "recommended_timeframe": timeframe,
+                "operational_effort": template["effort"],
+                "evidence_strength": source["evidence_strength"],
+                "evidence_score": score,
+            }
+        )
+    return actions
+
+
+def _forecast_advisory(
+    *, city_name: str, pollutant: str, horizon: int, peak: dict[str, Any] | None
+) -> dict[str, Any]:
+    if not peak or not peak.get("category") or peak.get("value") is None:
+        return {"status": "unavailable"}
+    category = str(peak["category"])
+    if category in {"Good", "Satisfactory"}:
+        advice = [
+            "Normal outdoor activity can continue.",
+            "Sensitive people should follow their usual health plan and local alerts.",
+        ]
+    elif category == "Moderate":
+        advice = [
+            "Sensitive groups should reduce prolonged or strenuous outdoor exertion.",
+            "Schools and workplaces should allow flexible indoor activity where needed.",
+        ]
+    else:
+        advice = [
+            "Reduce prolonged outdoor exertion, especially near the forecast peak.",
+            "Schools and outdoor workplaces should move strenuous activity indoors where practical.",
+            "Children, older adults and people with heart or lung conditions should follow local health guidance.",
+        ]
+    return {
+        "status": "available",
+        "headline": f"{category} air-quality conditions are forecast in {city_name}.",
+        "category": category,
+        "colour": peak.get("colour"),
+        "aqi": peak.get("aqi"),
+        "peak_value": peak["value"],
+        "peak_timestamp_utc": peak.get("timestamp_utc"),
+        "pollutant": pollutant,
+        "horizon": horizon,
+        "advice": advice,
+        "qualification": "Forecast guidance; follow official local alerts.",
+    }
+
+
 def _time(value: Any) -> datetime | None:
     try:
         stamp = pd.Timestamp(value)
@@ -427,7 +666,6 @@ async def _build_dynamic_snapshot(
     confidence = coverage_confidence(
         len(stations), youngest, provider_fraction, feature_completeness
     )
-    priority = intervention_priority(current_assessment.get("aqi"), confidence)
     forecast_priority = intervention_priority((peak or {}).get("aqi"), confidence)
     observations = sorted(
         [
@@ -529,6 +767,19 @@ async def _build_dynamic_snapshot(
             }
         )
         grid_features.append(feature)
+    sources = _source_screening(
+        weather=weather_current,
+        firms=firms,
+        osm=osm,
+        coverage_type=coverage_type,
+    )
+    actions = _action_queue(sources, forecast_priority)
+    advisory = _forecast_advisory(
+        city_name=city.name,
+        pollutant=pollutant,
+        horizon=horizon,
+        peak=peak,
+    )
     response = {
         "context": context,
         "current": current,
@@ -561,26 +812,18 @@ async def _build_dynamic_snapshot(
             "planning_method": "Live CAMS plus validation-selected persistence-residual transfer, lead-decayed station interpolation and bounded wind-aligned planning downscaling",
         },
         "intelligence": {
-            "priority": priority,
+            "priority": forecast_priority,
             "confidence": confidence,
             "firms_count": len(firms),
             "osm": osm,
+            "sources": sources,
+            "forecast_category": (peak or {}).get("category"),
+            "forecast_colour": (peak or {}).get("colour"),
+            "forecast_aqi": (peak or {}).get("aqi"),
+            "peak_value": (peak or {}).get("value"),
         },
-        "actions": []
-        if priority == "Unavailable"
-        else [
-            {
-                "priority": priority,
-                "action": "Verify leading source indicators in the highest forecast cells before field action.",
-            }
-        ],
-        "advisory": {
-            "status": "unavailable" if current is None else "available",
-            "category": current_assessment.get("category"),
-            "message": "Follow current local authority guidance and reduce prolonged outdoor exposure during elevated periods."
-            if current
-            else None,
-        },
+        "actions": actions,
+        "advisory": advisory,
         "provider_status": provider_status,
     }
     await cache.set(cache_key, response, 300)

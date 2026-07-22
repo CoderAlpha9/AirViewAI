@@ -142,17 +142,44 @@ export interface LiveIntelligence {
   confidence: number;
   firms_count: number;
   osm: Record<string, number | string | null>;
+  sources: Array<{
+    source_id: "meteorology" | "thermal" | "road" | "industrial" | "construction" | "background";
+    label: string;
+    score: number | null;
+    evidence_strength: "Unavailable" | "None" | "Low" | "Moderate" | "High" | "Very high";
+    description: string;
+    significant: boolean;
+  }>;
+  forecast_category: string | null;
+  forecast_colour: string | null;
+  forecast_aqi: number | null;
+  peak_value: number | null;
 }
 
 export interface LiveAction {
+  source_id: string;
+  source_label: string;
+  title: string;
   priority: string;
   action: string;
+  recommended_timeframe: string;
+  operational_effort: string;
+  evidence_strength: string;
+  evidence_score: number;
 }
 
 export interface LiveAdvisory {
   status: "available" | "unavailable";
-  category: string | null;
-  message: string | null;
+  headline?: string;
+  category?: string;
+  colour?: string | null;
+  aqi?: number | null;
+  peak_value?: number;
+  peak_timestamp_utc?: string | null;
+  pollutant?: Pollutant;
+  horizon?: Horizon;
+  advice?: string[];
+  qualification?: string;
 }
 
 export interface PanelResponse<T> {

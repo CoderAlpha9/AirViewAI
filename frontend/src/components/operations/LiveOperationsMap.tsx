@@ -61,7 +61,7 @@ export function LiveOperationsMap({
     const properties = feature.properties;
     const currentValue = properties?.current == null ? "Unavailable" : `${Number(properties.current).toFixed(1)} µg/m³`;
     const forecastValue = properties?.forecast == null ? "Unavailable" : `${Number(properties.forecast).toFixed(1)} µg/m³`;
-    const category = properties?.category ?? "Unclassified";
+    const category = properties?.category ?? "Category unavailable";
     const confidence = properties?.confidence == null ? "" : `<br>Confidence: ${Math.round(Number(properties.confidence) * 100)}%`;
     (layer as LeafletGeoJSON).bindTooltip(`Current: ${currentValue} · ${category}<br>${context.horizon}h forecast: ${forecastValue}${confidence}<br>Issued: ${issueLabel}`, { sticky: true });
   };

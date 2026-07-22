@@ -138,6 +138,41 @@ try {
     await waitFor("document.querySelector('[data-grid-cell-count] .leaflet-container')?.dataset.mapCityId", 60000);
     return evaluate(`(() => { const frame = document.querySelector('[data-grid-cell-count]'); const map = frame.querySelector('.leaflet-container'); const expectedGridCells = Number(frame.dataset.gridCellCount); const gridPaths = frame.querySelectorAll('.airview-grid-cell').length; const stationPaths = frame.querySelectorAll('.airview-station-marker').length; const firmsPaths = frame.querySelectorAll('.airview-firms-marker').length; return { city: ${JSON.stringify(name)}, renderedCity: frame.dataset.cityName, cityNameMatches: frame.dataset.cityName === ${JSON.stringify(name)}, cityId: map.dataset.mapCityId, cityIdMatchesFrame: map.dataset.mapCityId === frame.dataset.cityId, mapCenter: map.dataset.mapCenter, snapshotId: frame.dataset.snapshotId, expectedGridCells, gridPaths, stationPaths, firmsPaths, totalOperationalPaths: gridPaths + stationPaths + firmsPaths, allLeafletInteractivePaths: frame.querySelectorAll('.leaflet-interactive').length, activeGridMatchesMetadata: gridPaths === expectedGridCells }; })()`);
   }
+  async function captureDecisionContent(name) {
+    try {
+      await waitFor("document.querySelector('[data-testid=\"source-screening\"]') && document.querySelector('[data-testid=\"citizen-advisory-panel\"]') && document.querySelector('[data-testid=\"forecast-card\"]')?.dataset.snapshotId", 60000);
+    } catch (error) {
+      const diagnostic = await evaluate("({ header: document.querySelector('main h1')?.textContent, forecast: document.querySelector('[data-testid=\"forecast-card\"]')?.innerText, sourcePanel: Array.from(document.querySelectorAll('section')).find((item) => item.textContent.includes('Likely contributing context'))?.innerText, advisoryPanel: Array.from(document.querySelectorAll('section')).find((item) => item.textContent.includes('Citizen advisory'))?.innerText })");
+      throw new Error(`${error.message}; decision-panel diagnostic=${JSON.stringify(diagnostic)}`);
+    }
+    return evaluate(`(() => {
+      const sourcePanel = document.querySelector('[data-testid="source-screening"]');
+      const actionPanel = document.querySelector('[data-testid="action-queue-panel"]');
+      const advisoryPanel = document.querySelector('[data-testid="citizen-advisory-panel"]');
+      const advisory = document.querySelector('[data-testid="citizen-advisory"]');
+      const forecast = document.querySelector('[data-testid="forecast-card"]');
+      const sources = Array.from(sourcePanel.querySelectorAll('.source-evidence')).map((item) => ({ sourceId: item.querySelector('strong')?.textContent?.trim(), score: item.dataset.score === 'unavailable' ? null : Number(item.dataset.score), strength: item.dataset.evidenceStrength }));
+      const actions = Array.from(document.querySelectorAll('.action-card')).map((item) => ({ sourceId: item.dataset.sourceId, evidenceScore: Number(item.dataset.evidenceScore), title: item.querySelector('.action-heading strong')?.textContent?.trim(), text: item.querySelector(':scope > p:not(.action-source)')?.textContent?.trim() }));
+      const visibleText = [sourcePanel.innerText, actionPanel.innerText, advisoryPanel.innerText].join(' ');
+      const actionKeys = actions.map((item) => item.sourceId);
+      const actionCopy = actions.map((item) => item.text);
+      return {
+        city: ${JSON.stringify(name)},
+        pollutant: document.querySelectorAll('.control-bar select')[1].value,
+        horizon: Number(document.querySelectorAll('.control-bar select')[2].value),
+        sources,
+        actions,
+        advisoryAvailable: Boolean(advisory),
+        snapshots: { forecast: forecast.dataset.snapshotId, sources: sourcePanel.dataset.snapshotId, actions: actionPanel.dataset.snapshotId, advisory: advisoryPanel.dataset.snapshotId },
+        snapshotAligned: [sourcePanel.dataset.snapshotId, actionPanel.dataset.snapshotId, advisoryPanel.dataset.snapshotId].every((value) => value === forecast.dataset.snapshotId),
+        categoryAligned: advisory ? advisory.dataset.category === forecast.dataset.category : !forecast.dataset.category && advisoryPanel.dataset.status === 'unavailable',
+        allActionsSignificant: actions.every((item) => item.evidenceScore >= 25),
+        uniqueActionSources: new Set(actionKeys).size === actionKeys.length,
+        uniqueActionCopy: new Set(actionCopy).size === actionCopy.length,
+        forbiddenVisibleWording: ['indicator', 'unclassified', 'sensitivity', 'Influence indicators rank supporting context', 'Public-information guidance based on a model forecast'].filter((value) => visibleText.toLowerCase().includes(value.toLowerCase())),
+      };
+    })()`);
+  }
 
   await command("Page.enable");
   await command("Runtime.enable");
@@ -177,6 +212,45 @@ try {
   await waitFor("document.querySelector('.leaflet-container') && document.querySelectorAll('.leaflet-interactive').length > 1", 60000);
   const rapidSwitchFinalMap = await captureMapState("Delhi NCR");
 
+  await selectControl(1, "pm2_5");
+  await selectControl(2, "24");
+  const contentCitySequence = ["Ludhiana", "Delhi NCR", "Agra", "Amritsar", "Lucknow", "Mysuru", "Jaipur"];
+  const contentScenarios = [];
+  for (const name of contentCitySequence) {
+    await selectCityByName(name);
+    contentScenarios.push(await captureDecisionContent(name));
+    if (name === "Ludhiana") {
+      await evaluate("document.querySelector('[data-testid=\"source-screening\"]').scrollIntoView({ block: 'center' }); true");
+      await delay(250);
+      const sourceScreenshot = await command("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
+      await writeFile(join(reportDirectory, "airview-content-source-actions.png"), Buffer.from(sourceScreenshot.data, "base64"));
+      await evaluate("document.querySelector('[data-testid=\"action-queue-panel\"]')?.scrollIntoView({ block: 'center' }); true");
+      await delay(250);
+      const actionsScreenshot = await command("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
+      await writeFile(join(reportDirectory, "airview-content-actions.png"), Buffer.from(actionsScreenshot.data, "base64"));
+      await evaluate("document.querySelector('[data-testid=\"citizen-advisory-panel\"]').scrollIntoView({ block: 'center' }); true");
+      await delay(250);
+      const advisoryScreenshot = await command("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
+      await writeFile(join(reportDirectory, "airview-content-advisory.png"), Buffer.from(advisoryScreenshot.data, "base64"));
+    }
+  }
+  await selectCityByName("Ludhiana");
+  for (const pollutantValue of ["pm2_5", "pm10"]) {
+    await selectControl(1, pollutantValue);
+    for (const horizonValue of ["24", "48", "72"]) {
+      await selectControl(2, horizonValue);
+      contentScenarios.push(await captureDecisionContent("Ludhiana"));
+    }
+  }
+
+  const allSourceScores = contentScenarios.flatMap((scenario) => scenario.sources.map((source) => source.score)).filter((score) => score != null);
+  const sourceScoreBandsCovered = {
+    zero: allSourceScores.some((score) => score === 0),
+    medium: allSourceScores.some((score) => score >= 25 && score < 50),
+    high: allSourceScores.some((score) => score >= 50),
+  };
+  const contentConsistencyClean = contentScenarios.every((scenario) => scenario.snapshotAligned && scenario.categoryAligned && scenario.allActionsSignificant && scenario.uniqueActionSources && scenario.uniqueActionCopy && scenario.forbiddenVisibleWording.length === 0);
+
   const categoryLegendLabels = await evaluate("Array.from(document.querySelectorAll('[aria-label=\"Current air-quality category colour legend\"] span')).map((item) => item.textContent.trim()).filter((value) => ['Good', 'Satisfactory', 'Moderate', 'Poor', 'Very Poor', 'Severe'].includes(value))");
   const gridFillColours = await evaluate("Array.from(new Set(Array.from(document.querySelectorAll('.leaflet-overlay-pane path[fill]')).map((item) => item.getAttribute('fill')).filter((value) => value && value !== 'none')))");
   await evaluate("document.querySelector('.leaflet-container').scrollIntoView({ block: 'center' }); true");
@@ -197,7 +271,7 @@ try {
   const distinctSequenceSnapshots = new Set(citySnapshots).size;
   const mapLayersClean = [...mapLayerCounts, rapidSwitchFinalMap].every((item) => item.activeGridMatchesMetadata && item.cityIdMatchesFrame && item.cityNameMatches);
   const result = {
-    status: consoleErrors.length || failedRequests.length || mobileOverflow || distinctSequenceSnapshots !== 4 || !mapLayersClean || categoryLegendLabels.length !== 6 || gridFillColours.length === 0 ? "failed" : "passed",
+    status: consoleErrors.length || failedRequests.length || mobileOverflow || distinctSequenceSnapshots !== 4 || !mapLayersClean || categoryLegendLabels.length !== 6 || gridFillColours.length === 0 || !contentConsistencyClean || !Object.values(sourceScoreBandsCovered).every(Boolean) ? "failed" : "passed",
     progressiveSkeletonObserved,
     testedCitySequence,
     rapidSwitchSequence,
@@ -211,6 +285,10 @@ try {
     mapPaths: await evaluate("document.querySelectorAll('.leaflet-interactive').length"),
     categoryLegendLabels,
     gridFillColours,
+    contentCitySequence,
+    contentScenarios,
+    sourceScoreBandsCovered,
+    contentConsistencyClean,
     mobileOverflow,
     consoleErrors,
     failedRequests,
