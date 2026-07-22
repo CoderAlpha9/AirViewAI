@@ -4,16 +4,16 @@ import { BrandMark } from "../components/operations/Icons";
 
 export function AppLayout() {
   return (
-    <div className="min-h-screen bg-[#071011] text-slate-100">
-      <header className="sticky top-0 z-[1000] border-b border-slate-800/90 bg-[#071011]/95 backdrop-blur">
+    <div className="min-h-screen bg-[#0b1114] text-slate-100">
+      <header className="sticky top-0 z-[1000] border-b border-slate-800 bg-[#0b1114]">
         <div className="mx-auto flex h-16 max-w-[1560px] items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3 text-emerald-300">
             <BrandMark />
             <div>
-              <p className="text-sm font-semibold tracking-[0.16em] text-white">
+              <p className="text-sm font-semibold text-white">
                 AIRVIEW AI
               </p>
-              <p className="text-[10px] uppercase tracking-[0.12em] text-slate-500">
+              <p className="text-[10px] uppercase text-slate-500">
                 Smart city intervention intelligence
               </p>
             </div>

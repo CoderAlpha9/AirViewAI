@@ -14,4 +14,3 @@ class ProjectInfoResponse(BaseModel):
     problem_statement: str
     implementation_stage: str
     planned_modules: list[str]
-

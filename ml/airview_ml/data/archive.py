@@ -10,7 +10,9 @@ CONFIDENCE_WEIGHT = {"high": 1.0, "medium": 0.7, "low": 0.35, "review": 0.0, "no
 
 
 def rank_locations(
-    locations: list[dict[str, Any]], mappings: list[dict[str, Any]], availability: list[dict[str, Any]]
+    locations: list[dict[str, Any]],
+    mappings: list[dict[str, Any]],
+    availability: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Score candidates without treating OpenAQ metadata as downloaded measurements."""
     by_id = {int(item["id"]): item for item in locations}
@@ -23,7 +25,9 @@ def rank_locations(
         months = len(archive.get("available_months", []))
         files = int(archive.get("estimated_file_count") or 0)
         coordinates = location.get("coordinates") or {}
-        valid_coordinates = _valid_india_coordinates(coordinates.get("latitude"), coordinates.get("longitude"))
+        valid_coordinates = _valid_india_coordinates(
+            coordinates.get("latitude"), coordinates.get("longitude")
+        )
         score = (
             45 * ("pm2_5" in pollutants)
             + 22 * ("pm10" in pollutants)
@@ -45,7 +49,9 @@ def rank_locations(
                 "most_recent_file": archive.get("most_recent_file"),
                 "valid_coordinates": valid_coordinates,
                 "selection_score": round(score, 2),
-                "selection_reasons": _selection_reasons(pollutants, months, valid_coordinates, mapping),
+                "selection_reasons": _selection_reasons(
+                    pollutants, months, valid_coordinates, mapping
+                ),
             }
         )
     return sorted(ranked, key=lambda item: (-item["selection_score"], item["station_id"]))
@@ -83,15 +89,32 @@ def build_download_plan(
         count = int(item["estimated_file_count"])
         if max_files is not None and selected and planned_files + count > max_files:
             continue
-        selected.append({**item, "archive_start_requested": start.isoformat(), "archive_end_requested": end.isoformat()})
+        selected.append(
+            {
+                **item,
+                "archive_start_requested": start.isoformat(),
+                "archive_end_requested": end.isoformat(),
+            }
+        )
         by_city[item["city_id"]] += 1
         planned_files += count
     city_manifest = [
         {
             "city_id": city_id,
-            "selected_stations": [item["station_id"] for item in selected if item["city_id"] == city_id],
-            "expected_files": sum(int(item["estimated_file_count"]) for item in selected if item["city_id"] == city_id),
-            "available_pollutants": sorted({pollutant for item in selected if item["city_id"] == city_id for pollutant in item["available_pollutants"]}),
+            "selected_stations": [
+                item["station_id"] for item in selected if item["city_id"] == city_id
+            ],
+            "expected_files": sum(
+                int(item["estimated_file_count"]) for item in selected if item["city_id"] == city_id
+            ),
+            "available_pollutants": sorted(
+                {
+                    pollutant
+                    for item in selected
+                    if item["city_id"] == city_id
+                    for pollutant in item["available_pollutants"]
+                }
+            ),
             "intended_modelling_tier": "candidate_pending_downloaded_completeness_validation",
             "inclusion_reason": "ranked PM2.5-capable station with archive coverage and valid mapping",
         }
@@ -129,8 +152,13 @@ def _valid_india_coordinates(latitude: Any, longitude: Any) -> bool:
         return False
 
 
-def _selection_reasons(pollutants: set[str], months: int, valid_coordinates: bool, mapping: dict[str, Any]) -> list[str]:
-    reasons = [f"{months} archive months indexed", f"mapping confidence {mapping.get('mapping_confidence')}"]
+def _selection_reasons(
+    pollutants: set[str], months: int, valid_coordinates: bool, mapping: dict[str, Any]
+) -> list[str]:
+    reasons = [
+        f"{months} archive months indexed",
+        f"mapping confidence {mapping.get('mapping_confidence')}",
+    ]
     if "pm2_5" in pollutants:
         reasons.append("PM2.5 sensor capability")
     if "pm10" in pollutants:

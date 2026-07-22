@@ -15,7 +15,9 @@ class FirmsAdapter:
     def __init__(self, map_key: str | None) -> None:
         self.map_key = map_key
 
-    def fetch_area(self, bbox: tuple[float, float, float, float], days: int = 1, end_date: date | None = None) -> tuple[list[dict[str, Any]], SourceResult]:
+    def fetch_area(
+        self, bbox: tuple[float, float, float, float], days: int = 1, end_date: date | None = None
+    ) -> tuple[list[dict[str, Any]], SourceResult]:
         if not self.map_key:
             return [], SourceResult(
                 source=self.source,
@@ -38,10 +40,23 @@ class FirmsAdapter:
             rows = []
             for window_days, window_start in windows:
                 url = f"https://firms.modaps.eosdis.nasa.gov/api/area/csv/{self.map_key}/VIIRS_SNPP_NRT/{bbox_text}/{window_days}/{window_start.isoformat()}"
-                response = httpx.get(url, timeout=httpx.Timeout(connect=8, read=30, write=30, pool=8))
+                response = httpx.get(
+                    url, timeout=httpx.Timeout(connect=8, read=30, write=30, pool=8)
+                )
                 response.raise_for_status()
                 rows.extend(csv.DictReader(io.StringIO(response.text)))
-            rows = list({(row.get("latitude"), row.get("longitude"), row.get("acq_date"), row.get("acq_time"), row.get("frp")): row for row in rows}.values())
+            rows = list(
+                {
+                    (
+                        row.get("latitude"),
+                        row.get("longitude"),
+                        row.get("acq_date"),
+                        row.get("acq_time"),
+                        row.get("frp"),
+                    ): row
+                    for row in rows
+                }.values()
+            )
         except Exception as exc:
             return [], SourceResult(
                 source=self.source,
@@ -64,10 +79,21 @@ class FirmsAdapter:
         )
 
     @staticmethod
-    def influence_features(events: list[dict[str, Any]], latitude: float, longitude: float) -> dict[str, float]:
+    def influence_features(
+        events: list[dict[str, Any]], latitude: float, longitude: float
+    ) -> dict[str, float]:
         # Distances are approximate great-circle distances; wind alignment is calculated only when wind input exists upstream.
-        distances = [_haversine_km(latitude, longitude, float(event["latitude"]), float(event["longitude"])) for event in events]
-        return {"thermal_anomaly_count_25km": sum(distance <= 25 for distance in distances), "thermal_anomaly_count_50km": sum(distance <= 50 for distance in distances), "thermal_anomaly_count_100km": sum(distance <= 100 for distance in distances), "thermal_anomaly_count_300km": sum(distance <= 300 for distance in distances), "nearest_thermal_anomaly_distance_km": min(distances) if distances else None}
+        distances = [
+            _haversine_km(latitude, longitude, float(event["latitude"]), float(event["longitude"]))
+            for event in events
+        ]
+        return {
+            "thermal_anomaly_count_25km": sum(distance <= 25 for distance in distances),
+            "thermal_anomaly_count_50km": sum(distance <= 50 for distance in distances),
+            "thermal_anomaly_count_100km": sum(distance <= 100 for distance in distances),
+            "thermal_anomaly_count_300km": sum(distance <= 300 for distance in distances),
+            "nearest_thermal_anomaly_distance_km": min(distances) if distances else None,
+        }
 
 
 def _haversine_km(lat_a: float, lon_a: float, lat_b: float, lon_b: float) -> float:
@@ -75,5 +101,8 @@ def _haversine_km(lat_a: float, lon_a: float, lat_b: float, lon_b: float) -> flo
 
     latitude_delta = radians(lat_b - lat_a)
     longitude_delta = radians(lon_b - lon_a)
-    value = sin(latitude_delta / 2) ** 2 + cos(radians(lat_a)) * cos(radians(lat_b)) * sin(longitude_delta / 2) ** 2
+    value = (
+        sin(latitude_delta / 2) ** 2
+        + cos(radians(lat_a)) * cos(radians(lat_b)) * sin(longitude_delta / 2) ** 2
+    )
     return 6371 * 2 * asin(sqrt(value))

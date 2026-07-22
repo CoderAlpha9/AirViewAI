@@ -1,36 +1,21 @@
-# AirView AI - 3 to 4 Minute Demo Script
+# AirView AI demo script
 
-## 0:00-0:25 - Opening
-Show the landing dashboard at `/dashboard`.
+## Opening
 
-Say: "AirView AI is a smart-city air-quality intelligence platform for PS5. It moves beyond monitoring by combining live-provider forecasts, validated station history, weather, thermal-anomaly evidence and geospatial source proxies into one intervention workflow."
+Open `/dashboard`. Explain that panels load independently and that the selected city, pollutant and horizon update immediately.
 
-## 0:25-1:05 - Live and replay mode
-Select Delhi NCR, PM2.5, 72 hours. Start in Live mode. If live providers are not reachable during recording, switch to Replay.
+## City and provider workflow
 
-Say: "The product attempts current OpenAQ and Open-Meteo feeds. When any operational provider is unavailable, it does not fake live data. It switches to a validated historical replay, clearly labelled, with actual held-out observations."
+Switch among the five defaults, then search for an Indian city such as Mysuru. Point out provider, freshness, station count and station-corrected versus model-based coverage. If a provider is unavailable, show the local panel state; there is no replay or archived-value fallback.
 
-## 1:05-1:45 - Forecast panel
-Point to the chart.
+## Forecast evidence
 
-Say: "The forecast view compares AirView prediction, provider or persistence baseline, actual observations where available, and uncertainty bands for 24, 48 and 72 hour windows. This is designed for intervention scheduling, not just after-the-fact reporting."
+Switch PM2.5/PM10 and 24/48/72 hours. Explain that the operational trajectory starts from live CAMS. The optional learned correction was trained on station change from persistence—not archived CAMS error—and is transferred onto CAMS only where grouped validation selected it. Nearby live stations add a separate lead-decayed spatial correction.
 
-## 1:45-2:25 - Geospatial map and source intelligence
-Point to the map and source ranking.
+## Map and decisions
 
-Say: "The map shows the monitoring station, an intervention planning grid, bounded FIRMS thermal anomalies and OSM evidence where available. Source scores are evidence-supported influence indicators, not regulatory source apportionment. Missing evidence is shown explicitly, for example where OSM is unavailable."
+Show the relocated one-kilometre grid, current-category transparent colours, separate horizon forecast tooltip, station markers and FIRMS markers when available. Explain that source indicators guide field verification and are not emission shares.
 
-## 2:25-3:05 - Enforcement and intervention workflow
-Point to priority and action queue.
+## Fixed comparison
 
-Say: "AirView ranks source-influence context into inspection priorities and recommended action windows. Each action includes the source category, agency type, response window and caveat. Scenario sensitivity estimates potential direction and range, but does not claim proven causal impact."
-
-## 3:05-3:35 - Citizen advisories
-Switch language to Hindi or Punjabi.
-
-Say: "The same intelligence package generates public advisories in English, Hindi and Punjabi. Advisories preserve pollutant, severity, affected period, timestamp and public-information disclaimer."
-
-## 3:35-4:00 - Close
-Open India outlook cards.
-
-Say: "The current detailed pilot covers Delhi NCR, Agra, Amritsar, Lucknow and Ludhiana. The architecture is API-driven and can be expanded city-by-city through the same ingestion, readiness, forecasting and intervention pipeline."
+Close on the five-city next-24-hour PM2.5 comparison. Its peak value, AQI, category, colour and forecast priority come from one canonical snapshot per city.

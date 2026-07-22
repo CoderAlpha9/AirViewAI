@@ -1,224 +1,132 @@
 # AirView AI
 
-**ET AI Hackathon 2026 - Problem Statement 5: AI-Powered Urban Air Quality Intelligence for Smart City Intervention**
+AirView AI is an operational air-quality decision-support dashboard for Indian cities. It combines live numerical air-quality and weather forecasts, nearby monitoring stations when available, a persisted city-agnostic residual model, thermal anomalies and mapped source context into consistent current conditions, forecasts, one-kilometre planning grids, interventions and citizen guidance.
 
-AirView AI is a five-city operational air-quality decision-support prototype for Agra, Amritsar, Delhi NCR, Lucknow, and Ludhiana. It combines current station observations where available, numerical air-quality and weather forecasts, NASA FIRMS thermal-anomaly evidence, OpenStreetMap source proxies, and validated historical models to turn monitoring data into 24-72 hour forecasts, source-influence screening, geospatial intervention views, prioritised actions, and multilingual citizen guidance.
-
-The product is designed for a hackathon demonstration, but its outputs remain source-honest:
-
-- current feeds are used when providers respond;
-- station observations are distinguished from modelled CAMS current values;
-- the dashboard falls back to a clearly labelled validated replay when current providers fail;
-- source results are evidence-supported screening, not regulatory source apportionment;
-- intervention values are scenario sensitivities, not causal impact estimates;
-- the 1 km view is a transparent intervention-planning downscaling around the selected station, not an independently resolved atmospheric simulation.
-
-## Final demo experience
-
-The production-facing frontend contains one focused command dashboard. It exposes no development logs, validation pages, raw stack traces, or internal audit views.
-
-The dashboard provides:
-
-- **Operational / validated replay modes** with explicit provenance and freshness
-- **PM2.5 and PM10 forecasts** for 24, 48, or 72 hours
-- **Current concentration** from recent OpenAQ station data where available, otherwise a labelled CAMS modelled current value
-- **Forecast fusion** using CAMS, live station bias, and validated Ridge endpoint models
-- **Actual versus forecast trajectories** in replay mode, persistence/provider baselines, and 90% intervals
-- **Exploratory Indian PM AQI-style categories** calculated from rolling 24-hour concentration where enough hours exist
-- **Geospatial intervention map** with station, 1 km cells, current/historical FIRMS evidence, wind context, and OpenStreetMap attribution
-- **Source-influence screening** across transport, industry, construction/road dust, burning activity, regional thermal anomalies, meteorological accumulation, and unresolved background
-- **Priority action queue** with agency, response time, cost tier, assumptions, and sensitivity range
-- **Citizen advisories** in English, Hindi, and Punjabi
-- **Five-city comparison** with a shared PM2.5 24-hour outlook
-
-## Data and model foundation
-
-The included validated pilot contains approximately:
-
-- 866,000 real OpenAQ sensor observations
-- 40,800 station-hour records
-- PM2.5 and PM10 coverage for five historical pilot stations
-- historical range from February 2025 to March 2026
-- 1,111,362 canonical NASA FIRMS thermal-anomaly events
-- 1,700 causal station/timestamp FIRMS feature rows
-- 23,716 source-influence screening records
-- PM2.5 and PM10 models for 24, 48, and 72-hour horizons
-- persistence, daily, weekly, and rolling baseline evaluation
-- global and city-local Ridge candidates, with persistence retained wherever it performed better
-
-## Live operational path
-
-When the dashboard is in **Operational** mode, the backend attempts the following concurrently:
-
-1. **OpenAQ v3** for recent station observations and hourly history
-2. **Open-Meteo Air Quality** for current and future CAMS PM2.5/PM10 fields
-3. **Open-Meteo Weather** for wind, precipitation, visibility, pressure, and boundary-layer context
-4. **NASA FIRMS near-real-time** for thermal anomalies around the selected city
-5. **OpenStreetMap-derived evidence** from the validated local cache
-
-The forecast engine then:
-
-1. prefers a recent station observation when available;
-2. uses CAMS current air quality when station data is delayed or unavailable;
-3. fuses the future CAMS trajectory with a decaying station/model bias;
-4. applies endpoint corrections from validated 24/48/72-hour Ridge models when feature completeness permits;
-5. attaches calibrated uncertainty intervals and AQI-style categories;
-6. builds a bounded 1 km intervention grid from the city-scale forecast, wind direction, and stagnation context.
-
-All live provider calls use bounded timeouts, retries, and TTL caching. Provider failures never generate fake current readings; the system switches to a labelled replay instead.
-
-## Five-city station contexts
-
-| City | Operational station context | Replay behaviour |
-|---|---|---|
-| Delhi NCR | Anand Vihar | Same validated station context |
-| Agra | Sanjay Palace | Same validated station context |
-| Amritsar | Golden Temple | Same validated station context |
-| Lucknow | Talkatora | Same validated station context |
-| Ludhiana | Punjab Agricultural University | The immutable v1 replay used Civil Line, Jalandhar as a regional Punjab station. This is disclosed in the UI and its spatial evidence is never mixed into the live Ludhiana context. |
-
-## Quick start on Windows
-
-### 1. Install dependencies once
-
-```powershell
-.\scripts\bootstrap.ps1
-```
-
-### 2. Configure provider credentials
-
-Copy the template only when `backend/.env` is absent:
-
-```powershell
-Copy-Item backend\.env.example backend\.env
-```
-
-Set the following without committing the file:
-
-```text
-OPENAQ_API_KEY=
-NASA_FIRMS_MAP_KEY=
-DATA_GOV_IN_API_KEY=
-COPERNICUS_CLIENT_ID=
-COPERNICUS_CLIENT_SECRET=
-```
-
-Only OpenAQ and NASA FIRMS are required for their corresponding current evidence. Open-Meteo air-quality and weather forecasts do not require keys. Sentinel-5P is not used in the operational dashboard because the validated prototype recovered no usable pixels.
-
-### 3. Start the complete demo
-
-```powershell
-.\scripts\run_demo.ps1
-```
-
-Open:
-
-- Dashboard: `http://127.0.0.1:5173/`
-- Dashboard alias: `http://127.0.0.1:5173/dashboard`
-- API documentation: `http://127.0.0.1:8000/docs`
-
-### Run services separately
-
-From the repository root, activate the virtual environment and start the API:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-python -m uvicorn backend.app.main:app --app-dir backend --host 127.0.0.1 --port 8000 --reload
-```
-
-In a second terminal, start the frontend. `VITE_API_BASE_URL` is optional and defaults
-to `http://127.0.0.1:8000/api`.
-
-```powershell
-$env:VITE_API_BASE_URL = "http://127.0.0.1:8000/api"
-npm --prefix frontend run dev -- --host 127.0.0.1 --port 5173
-```
-
-### 4. Verify the demo
-
-```powershell
-.\scripts\verify_demo.ps1
-```
-
-### 5. Stop only demo-owned processes
-
-```powershell
-.\scripts\stop_demo.ps1
-```
-
-The scripts use a demo-specific process state file and do not stop unrelated Python or Node processes.
-
-## Main API
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| GET | `/api/health` | Backend health |
-| GET | `/api/operations/status` | Provider and capability status |
-| GET | `/api/operations/cities` | Operational city/station registry |
-| GET | `/api/operations/dashboard` | Complete live or replay dashboard package |
-| GET | `/api/operations/network` | Compact five-city comparison |
-
-Example:
-
-```text
-GET /api/operations/dashboard?city_id=delhi-ncr&pollutant=pm2_5&horizon=72&language=en
-```
-
-Supported values:
-
-- `city_id`: `delhi-ncr`, `agra`, `amritsar`, `lucknow`, `ludhiana`
-- `pollutant`: `pm2_5`, `pm10`
-- `horizon`: `24`, `48`, `72`
-- `language`: `en`, `hi`, `pa`
-- `mode`: `live`, `demo`
+The five quick-select cities are Delhi NCR, Agra, Amritsar, Lucknow and Ludhiana. Nominatim-backed search can resolve additional Indian cities without changing the dashboard workflow.
 
 ## Architecture
 
-![AirView AI architecture](docs/architecture/assets/airview-final-architecture.svg)
+- **React, TypeScript and Vite:** progressively loads each dashboard panel and rejects stale or context-mismatched responses.
+- **FastAPI:** resolves cities, calls providers concurrently, assembles canonical snapshots and serves independent live panels.
+- **ML service:** loads persisted pollutant/horizon artifacts and transfers only validation-selected persistence-trained corrections onto live CAMS trajectories and grid cells.
+- **Leaflet:** fits the resolved city boundary, grid and stations; it renders GeoJSON cells as a single layer for responsive interaction.
 
-The detailed flow and trust boundaries are documented in [docs/architecture/system-overview.md](docs/architecture/system-overview.md).
+Every panel context includes city, pollutant, horizon, issue time, snapshot ID, freshness and coverage type. Successful panels remain visible if an unrelated provider fails.
 
-## Validate from source
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Live data providers
+
+| Provider | Operational use | Credential |
+|---|---|---|
+| CPCB via Data.gov.in | Indian station observations | Optional `DATA_GOV_IN_API_KEY` |
+| OpenAQ v3 | Nearby stations and recent observations | Optional `OPENAQ_API_KEY` |
+| CAMS via Open-Meteo Air Quality | Current and hourly PM2.5/PM10 numerical fields | None |
+| Open-Meteo Weather | Current/hourly meteorology | None |
+| NASA FIRMS | Near-real-time thermal anomalies | Optional `NASA_FIRMS_MAP_KEY` |
+| OSM Overpass | Road, industry and construction context | None |
+| OSM Nominatim | Indian city search, centres and boundaries | None |
+
+Missing credentials or provider outages produce explicit unavailable/partial metadata. They never trigger archived-reading substitution. CAMS may provide a clearly labelled modelled current value when no usable station observation exists.
+
+See [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md).
+
+## Forecast and coverage
+
+The forecast starts from live CAMS/Open-Meteo hourly values. Six persisted HistGradientBoosting artifacts cover PM2.5 and PM10 at 24, 48 and 72 hours. They were trained to predict future station observation minus the issue-time station observation—a persistence residual. Archived CAMS fields were not present in training. Leave-one-city-out validation selects whether transferring that learned correction or applying zero learned correction is safer for each pollutant/horizon; this is not a validated CAMS-error model. Spatial live-station residuals use up to five freshness-, distance- and provider-ranked stations and decay with forecast lead time.
+
+- **Station-corrected:** one or more usable nearby monitoring stations contributed a spatial residual.
+- **Model-based:** no usable station correction was available; confidence is reduced and the UI labels this explicitly.
+
+The grid is a one-kilometre operational planning layer, not a regulatory dispersion model. See [docs/ML_METHODOLOGY.md](docs/ML_METHODOLOGY.md).
+
+Unqualified AQI categories and category colours describe the current concentration only. Forecast peaks are labelled as forecasts. Map cells use the backend current-category palette with transparent fills and retain the selected-horizon forecast as a separate tooltip value.
+
+## Setup
+
+Prerequisites: Windows PowerShell, Python 3.10+ and Node.js/npm.
+
+```powershell
+.\scripts\bootstrap.ps1
+Copy-Item .env.example backend\.env
+```
+
+Provider credentials are optional. Leave unused values blank. `backend/.env` is ignored by Git.
+
+### Environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `AIRVIEW_API_HOST` | `127.0.0.1` | API bind host |
+| `AIRVIEW_API_PORT` | `8000` | API port metadata |
+| `AIRVIEW_CORS_ORIGINS` | localhost/127.0.0.1 on 5173 | Allowed frontend origins |
+| `AIRVIEW_LOG_LEVEL` | `INFO` | Backend logging level |
+| `AIRVIEW_LIVE_PROVIDER_TIMEOUT_SECONDS` | `20` | Provider timeout budget |
+| `AIRVIEW_OPERATIONAL_CACHE_SECONDS` | `600` | Operational cache duration |
+| `DATA_GOV_IN_API_KEY` | blank | Optional CPCB/Data.gov.in access |
+| `OPENAQ_API_KEY` | blank | Optional OpenAQ v3 access |
+| `NASA_FIRMS_MAP_KEY` | blank | Optional FIRMS access |
+| `COPERNICUS_CLIENT_ID/SECRET` | blank | Offline ingestion utilities; not required by the dashboard |
+| `VITE_API_BASE_URL` | `http://127.0.0.1:8000/api` | Frontend API origin |
+
+## Run from the repository root
+
+Backend and frontend in separate terminals:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_backend.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_frontend.ps1
+```
+
+Combined launcher:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_demo.ps1
+```
+
+Custom ports remain synchronized across backend CORS, frontend API configuration and verification:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_demo.ps1 -BackendPort 8100 -FrontendPort 5180
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify_demo.ps1 -BackendPort 8100 -FrontendPort 5180
+```
+
+Verify and stop:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify_demo.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop_demo.ps1
+```
+
+Dashboard: `http://127.0.0.1:5173/`
+API docs: `http://127.0.0.1:8000/docs`
+
+## Validation
 
 ```powershell
 .\.venv\Scripts\python.exe -m ruff check backend ml
+.\.venv\Scripts\python.exe -m ruff format --check backend ml
 .\.venv\Scripts\python.exe -m pytest backend\tests ml\tests
 npm --prefix frontend run lint
 npm --prefix frontend run typecheck
+npm --prefix frontend run test
 npm --prefix frontend run build
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify_demo.ps1
 ```
 
-## Repository structure
+## Known external limitations
 
-```text
-AirViewAI/
-├── backend/                  FastAPI operational service and tests
-├── frontend/                 Demo-only React command dashboard
-├── ml/                       Reproducible data, forecast, and intelligence pipelines
-├── data/                     Cached raw and validated processed evidence
-├── models/                   Versioned forecast model artifacts
-├── outputs/                  Reports, replay examples, figures, and submission assets
-├── docs/                     Architecture, methodology, product, and submission notes
-├── scripts/                  Bootstrap, run, verify, and stop workflows
-└── README.md
-```
+- Station availability depends on provider coverage, credentials, freshness and rate limits; many cities have model-based coverage.
+- Data.gov.in, OpenAQ, FIRMS, Overpass and Nominatim can throttle or fail independently.
+- Open-Meteo/CAMS is a numerical model, not a ground observation.
+- FIRMS detects thermal anomalies but does not identify emission source type.
+- OSM features are contextual proxies and are not source apportionment.
+- The residual validation used archived station persistence as its causal baseline because archived cell-level CAMS inputs were not retained. Reported validation is not a direct historical evaluation of the live CAMS-plus-residual stack.
+- Citizen guidance is public-information support, not medical advice; interventions require field verification.
 
-## Limitations
+## Repository layout
 
-- The detailed validated scope is five cities, not full pan-India operational coverage.
-- OpenAQ observations may be delayed or absent; CAMS is then labelled as a modelled current value.
-- CPCB/Data.gov.in access was unreliable during development and is not required by the demo runtime.
-- Sentinel-5P is explicitly unavailable in this prototype after authenticated requests returned zero valid pixels.
-- GHSL population exposure is not shown because an official raster was not ingested.
-- OSM evidence is unavailable for Agra and Amritsar; live Ludhiana does not reuse the old Jalandhar OSM row.
-- Station density is insufficient for a calibrated citywide 1 km atmospheric forecast. The displayed 1 km cells are intervention-planning downscaling and are labelled accordingly.
-- Source rankings are likelihood/context indicators rather than confirmed source shares.
-- Recommended actions require field verification before enforcement.
-- Citizen messages are prototype public information and not medical advice.
-
-## Submission assets
-
-Final submission materials are stored under `docs/submission/` and `outputs/submission/`, including the architecture diagram, presentation deck, demo script, and final validation summary.
+`backend/` contains the operational API, `frontend/` the production dashboard, `ml/` training/evaluation utilities, `models/` persisted artifacts, `docs/` methodology and delivery documentation, and `scripts/` root-level setup/run/verification commands.
 
 ## License
 

@@ -1,44 +1,33 @@
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 
-import {
-  getOperationalCities,
-  getOperationsDashboard,
-  getNetworkOverview,
-  operationsError,
-  type CityConfig,
-  type Language,
-  type NetworkOverview,
-  type OperationsDashboard,
-  type Pollutant,
-} from "../api/operations";
-import { ForecastChart } from "../components/operations/ForecastChart";
+import { type Horizon, type LivePanel, type Pollutant } from "../api/live";
+import { getNetworkOverview, type NetworkOverview } from "../api/operations";
+import { CitySearch } from "../components/operations/CitySearch";
+import { LiveForecastChart } from "../components/operations/LiveForecastChart";
 import { RefreshIcon } from "../components/operations/Icons";
-import { MetricCard } from "../components/operations/MetricCard";
+import { EmptyPanel, PanelError, PanelSkeleton } from "../components/operations/PanelStatus";
 import { Section } from "../components/operations/Section";
+import {
+  type ActiveCity,
+  useProgressiveDashboard,
+} from "../features/operations/useProgressiveDashboard";
 
-const OperationsMap = lazy(() =>
-  import("../components/operations/OperationsMap").then((module) => ({
-    default: module.OperationsMap,
+const LiveOperationsMap = lazy(() =>
+  import("../components/operations/LiveOperationsMap").then((module) => ({
+    default: module.LiveOperationsMap,
   })),
 );
 
-const aqiColor: Record<string, string> = {
-  Good: "#54d189",
-  Satisfactory: "#9acb59",
-  Moderate: "#e1ba4e",
-  Poor: "#ef8d45",
-  "Very Poor": "#ef5a5a",
-  Severe: "#b95073",
-};
+const defaultCities: ActiveCity[] = [
+  { query: "delhi-ncr", cityId: "delhi-ncr", name: "Delhi NCR", state: "Delhi" },
+  { query: "agra", cityId: "agra", name: "Agra", state: "Uttar Pradesh" },
+  { query: "amritsar", cityId: "amritsar", name: "Amritsar", state: "Punjab" },
+  { query: "lucknow", cityId: "lucknow", name: "Lucknow", state: "Uttar Pradesh" },
+  { query: "ludhiana", cityId: "ludhiana", name: "Ludhiana", state: "Punjab" },
+];
 
-function localDate(value: string) {
+function localDate(value?: string | null) {
+  if (!value) return "Unavailable";
   return new Intl.DateTimeFormat("en-IN", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -46,125 +35,109 @@ function localDate(value: string) {
   }).format(new Date(value));
 }
 
-function titlePollutant(value: Pollutant) {
+function pollutantLabel(value: Pollutant) {
   return value === "pm2_5" ? "PM2.5" : "PM10";
 }
 
-function LoadingDashboard() {
+function coverageLabel(value?: string) {
+  return value === "station_corrected" ? "Station-corrected" : "Model-based";
+}
+
+function retryButton(panel: LivePanel, retry: (panel: LivePanel) => void) {
   return (
-    <div className="grid gap-4 lg:grid-cols-4" aria-live="polite">
-      {Array.from({ length: 8 }, (_, index) => (
-        <div
-          key={index}
-          className="h-36 animate-pulse rounded-xl border border-slate-800 bg-slate-900/80"
-        />
-      ))}
-    </div>
+    <button className="text-xs font-semibold text-teal-300 hover:text-teal-200" onClick={() => retry(panel)}>
+      Retry
+    </button>
   );
 }
 
 export function OperationsDashboardPage() {
-  const [cities, setCities] = useState<CityConfig[]>([]);
-  const [cityId, setCityId] = useState("delhi-ncr");
+  const [activeCity, setActiveCity] = useState<ActiveCity>(defaultCities[0]);
+  const [cityOptions, setCityOptions] = useState(defaultCities);
   const [pollutant, setPollutant] = useState<Pollutant>("pm2_5");
-  const [horizon, setHorizon] = useState<24 | 48 | 72>(72);
-  const [language, setLanguage] = useState<Language>("en");
-  const [dashboard, setDashboard] = useState<OperationsDashboard>();
+  const [horizon, setHorizon] = useState<Horizon>(24);
+  const { states, retry, snapshotId } = useProgressiveDashboard(activeCity, pollutant, horizon);
   const [network, setNetwork] = useState<NetworkOverview>();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [networkStatus, setNetworkStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [networkRefresh, setNetworkRefresh] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
-    void getOperationalCities(controller.signal)
-      .then(setCities)
-      .catch((reason: unknown) => {
-        if (!controller.signal.aborted) setError(operationsError(reason));
+    setNetworkStatus("loading");
+    void getNetworkOverview(controller.signal)
+      .then((data) => {
+        setNetwork(data);
+        setNetworkStatus("ready");
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setNetworkStatus("error");
       });
     return () => controller.abort();
-  }, []);
+  }, [networkRefresh]);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    void getNetworkOverview(controller.signal)
-      .then(setNetwork)
-      .catch(() => undefined);
-    return () => controller.abort();
-  }, [refreshKey]);
+  const currentState = states.current;
+  const stationState = states.stations;
+  const forecastState = states.forecast;
+  const mapState = states.map;
+  const intelligenceState = states["source-intelligence"];
+  const actionState = states.actions;
+  const advisoryState = states.advisory;
+  const current = currentState.data;
+  const forecast = forecastState.data;
+  const intelligence = intelligenceState.data;
+  const stations = useMemo(() => stationState.data?.stations ?? [], [stationState.data]);
 
-  const loadDashboard = useCallback(
-    (signal: AbortSignal) => {
-      setLoading(true);
-      setError("");
-      return getOperationsDashboard(
-        { cityId, pollutant, horizon, language },
-        signal,
-      )
-        .then(setDashboard)
-        .catch((reason: unknown) => {
-          if (!signal.aborted) setError(operationsError(reason));
-        })
-        .finally(() => {
-          if (!signal.aborted) setLoading(false);
-        });
-    },
-    [cityId, horizon, language, pollutant],
-  );
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void loadDashboard(controller.signal);
-    return () => controller.abort();
-  }, [loadDashboard, refreshKey]);
-
-  const selectedCity = cities.find((city) => city.city_id === cityId);
-  const peak = dashboard?.forecast.peak;
-  const topSources = useMemo(
+  const mapStations = useMemo(
     () =>
-      dashboard?.intelligence.rankings
-        .filter((item) => item.influence != null)
-        .slice(0, 5) ?? [],
-    [dashboard],
+      mapState.context && stationState.context?.snapshot_id === mapState.context.snapshot_id
+        ? stations
+        : [],
+    [mapState.context, stationState.context, stations],
   );
+  const mapCurrent =
+    mapState.context && currentState.context?.snapshot_id === mapState.context.snapshot_id
+      ? current
+      : undefined;
+
+  const chooseCity = (city: ActiveCity) => {
+    setCityOptions((options) =>
+      options.some((item) => item.cityId === city.cityId)
+        ? options
+        : [...options, city],
+    );
+    setActiveCity(city);
+  };
 
   return (
-    <div className="mx-auto w-full max-w-[1560px] px-4 pb-12 pt-5 sm:px-6 lg:px-8">
-      <header className="mb-5 flex flex-col justify-between gap-5 border-b border-slate-800 pb-5 xl:flex-row xl:items-end">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">
-              Urban air operations
-            </p>
-            <span
-              className="status-chip status-live"
-            >
-              Live operational data
-            </span>
-          </div>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-            Air-quality intervention command centre
-          </h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-            Forecast pollution 24–72 hours ahead, identify likely contributing
-            context, and prioritise field action from one operational view.
+    <div className="mx-auto w-full max-w-[1500px] px-4 pb-10 pt-5 sm:px-6 lg:px-8">
+      <header className="mb-4 flex flex-col justify-between gap-3 border-b border-slate-800 pb-4 md:flex-row md:items-end">
+        <div className="min-w-0">
+          <p className="section-kicker">Urban air operations</p>
+          <h1 className="mt-1 truncate text-2xl font-semibold text-white sm:text-3xl">{activeCity.name}</h1>
+          <p className="mt-1 text-sm text-slate-400">
+            {activeCity.state ?? "India"} · {pollutantLabel(pollutant)} · next {horizon} hours
           </p>
         </div>
-        <p className="text-xs text-slate-500">
-          Last assembled{" "}
-          {dashboard ? localDate(dashboard.generated_at_utc) : "—"}
-        </p>
+        <div className="text-left text-xs text-slate-500 md:text-right">
+          <p>{snapshotId ? `Snapshot ${snapshotId}` : "Establishing live snapshot"}</p>
+          <p className="mt-1">Panels update independently</p>
+        </div>
       </header>
 
-      <div className="control-bar mb-5">
+      <div className="control-bar mb-3">
         <label>
-          <span>City</span>
+          <span>Quick-select city</span>
           <select
-            value={cityId}
-            onChange={(event) => setCityId(event.target.value)}
+            value={activeCity.cityId ?? activeCity.query}
+            onChange={(event) => {
+              const selected = cityOptions.find(
+                (city) => (city.cityId ?? city.query) === event.target.value,
+              );
+              if (selected) setActiveCity(selected);
+            }}
           >
-            {cities.map((city) => (
-              <option key={city.city_id} value={city.city_id}>
+            {cityOptions.map((city) => (
+              <option key={city.cityId ?? city.query} value={city.cityId ?? city.query}>
                 {city.name}
               </option>
             ))}
@@ -172,405 +145,165 @@ export function OperationsDashboardPage() {
         </label>
         <label>
           <span>Pollutant</span>
-          <select
-            value={pollutant}
-            onChange={(event) => setPollutant(event.target.value as Pollutant)}
-          >
+          <select value={pollutant} onChange={(event) => setPollutant(event.target.value as Pollutant)}>
             <option value="pm2_5">PM2.5</option>
             <option value="pm10">PM10</option>
           </select>
         </label>
         <label>
           <span>Forecast window</span>
-          <select
-            value={horizon}
-            onChange={(event) =>
-              setHorizon(Number(event.target.value) as 24 | 48 | 72)
-            }
-          >
-            <option value={24}>Next 24 hours</option>
-            <option value={48}>Next 48 hours</option>
-            <option value={72}>Next 72 hours</option>
-          </select>
-        </label>
-        <label>
-          <span>Advisory language</span>
-          <select
-            value={language}
-            onChange={(event) => setLanguage(event.target.value as Language)}
-          >
-            <option value="en">English</option>
-            <option value="hi">हिन्दी</option>
-            <option value="pa">ਪੰਜਾਬੀ</option>
+          <select value={horizon} onChange={(event) => setHorizon(Number(event.target.value) as Horizon)}>
+            <option value={24}>24 hours</option>
+            <option value={48}>48 hours</option>
+            <option value={72}>72 hours</option>
           </select>
         </label>
         <button
           className="refresh-button"
-          onClick={() => setRefreshKey((value) => value + 1)}
-          disabled={loading}
+          onClick={() => {
+            (Object.keys(states) as LivePanel[]).forEach(retry);
+            setNetworkRefresh((value) => value + 1);
+          }}
         >
-          <RefreshIcon />
-          Refresh
+          <RefreshIcon /> Refresh all
         </button>
       </div>
+      <CitySearch onSelect={chooseCity} />
 
-      {error && (
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
-          <span>{error}</span>
-          <button
-            className="text-xs font-semibold uppercase tracking-wide"
-            onClick={() => setRefreshKey((value) => value + 1)}
-          >
-            Retry
-          </button>
-        </div>
-      )}
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <article className="metric-card" data-testid="current-card">
+          <p className="metric-label">Current concentration</p>
+          {currentState.status === "loading" && !current ? <PanelSkeleton height="h-20" /> : current ? (
+            <>
+              <p className="metric-value" style={{ color: current.colour ?? undefined }}>{current.value.toFixed(1)} <span>µg/m³</span></p>
+              <p className="metric-detail">{current.category ?? "Unclassified"}{current.aqi != null ? ` · AQI ${current.aqi}` : ""}</p>
+              <p className="metric-meta" title={current.station_name ?? current.provider}>{current.station_name ?? current.provider} · {current.freshness.label}</p>
+            </>
+          ) : <PanelError message={currentState.error ?? "Current conditions unavailable."} onRetry={() => retry("current")} />}
+        </article>
 
-      {loading && !dashboard ? (
-        <LoadingDashboard />
-      ) : (
-        dashboard && (
-          <>
-            <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <MetricCard
-                label="Current concentration"
-                value={
-                  <>
-                    {dashboard.current.value.toFixed(1)}{" "}
-                    <span className="text-base font-medium text-slate-400">
-                      µg/m³
-                    </span>
-                  </>
-                }
-                detail={`${dashboard.current.source} · ${localDate(dashboard.current.timestamp_utc)}`}
-              />
-              <MetricCard
-                label={`${horizon}h forecast peak`}
-                value={peak ? `${peak.value.toFixed(1)} µg/m³` : "Unavailable"}
-                detail={
-                  peak
-                    ? `Expected around ${localDate(peak.timestamp_utc)}`
-                    : "No peak could be resolved"
-                }
-                accent={aqiColor[peak?.category ?? ""]}
-              />
-              <MetricCard
-                label="Forecast AQI category"
-                value={peak?.category ?? "Unclassified"}
-                detail={
-                  peak?.aqi != null
-                    ? `Exploratory 24-hour PM sub-index: ${peak.aqi}`
-                    : "Insufficient rolling window for AQI sub-index"
-                }
-                accent={aqiColor[peak?.category ?? ""]}
-              />
-              <MetricCard
-                label="Intervention priority"
-                value={dashboard.intelligence.priority}
-                detail={`${Math.round(dashboard.intelligence.confidence * 100)}% evidence confidence · ${dashboard.intelligence.firms_event_count} thermal anomalies`}
-                accent={
-                  dashboard.intelligence.priority === "Critical"
-                    ? "#ef5a5a"
-                    : "#f2c14e"
-                }
-              />
+        <article className="metric-card" data-testid="forecast-card">
+          <p className="metric-label">{horizon}h forecast peak</p>
+          {forecastState.status === "loading" && !forecast ? <PanelSkeleton height="h-20" /> : forecast?.peak ? (
+            <>
+              <p className="metric-value">{forecast.peak.value.toFixed(1)} <span>µg/m³</span></p>
+              <p className="metric-detail">{forecast.peak.aqi != null ? `Forecast AQI ${forecast.peak.aqi}` : "Forecast AQI unavailable"}</p>
+              <p className="metric-meta">Peak near {localDate(forecast.peak.timestamp_utc)}</p>
+            </>
+          ) : <PanelError message={forecastState.error ?? "Forecast unavailable."} onRetry={() => retry("forecast")} />}
+        </article>
+
+        <article className="metric-card" data-testid="priority-card">
+          <p className="metric-label">Current intervention priority</p>
+          {intelligenceState.status === "loading" && !intelligence ? <PanelSkeleton height="h-20" /> : intelligence ? (
+            <>
+              <p className="metric-value">{intelligence.priority}</p>
+              <p className="metric-detail">{Math.round(intelligence.confidence * 100)}% evidence confidence</p>
+              <p className="metric-meta">{intelligence.firms_count} current thermal anomalies</p>
+            </>
+          ) : <PanelError message={intelligenceState.error ?? "Priority unavailable."} onRetry={() => retry("source-intelligence")} />}
+        </article>
+
+        <article className="metric-card" data-testid="coverage-card">
+          <p className="metric-label">Monitoring coverage</p>
+          {stationState.status === "loading" && !stationState.data ? <PanelSkeleton height="h-20" /> : stationState.status === "ready" ? (
+            <>
+              <p className="metric-value">{stationState.data.available_count} <span>available</span></p>
+              <p className="metric-detail">{stationState.data.selected_count} selected · {coverageLabel(stationState.context.coverage_type)}</p>
+              <p className="metric-meta">{current?.station_id ? "1 station used" : "No station correction"} · {stations[0]?.freshness.label ?? "No station feed"}</p>
+            </>
+          ) : <PanelError message={stationState.error ?? "Station coverage unavailable."} onRetry={() => retry("stations")} />}
+        </article>
+      </div>
+
+      <div className="mt-4 grid gap-4 xl:grid-cols-[1.55fr_0.85fr]">
+        <Section title={`${pollutantLabel(pollutant)} forecast trajectory`} eyebrow="Forecast">
+          {forecastState.status === "loading" && !forecast ? <PanelSkeleton height="h-[340px]" /> : forecast?.points.length && forecastState.context ? (
+            <LiveForecastChart forecast={forecast} context={forecastState.context} />
+          ) : <PanelError message={forecastState.error ?? "Forecast data is unavailable."} onRetry={() => retry("forecast")} />}
+        </Section>
+        <Section title="Source context" eyebrow="Evidence" action={intelligenceState.status === "error" ? retryButton("source-intelligence", retry) : undefined}>
+          {intelligenceState.status === "loading" && !intelligence ? <PanelSkeleton height="h-64" /> : intelligence ? (
+            <div className="space-y-3">
+              <div className="evidence-row"><span>Relative evidence strength</span><strong>{intelligence.confidence >= 0.75 ? "High" : intelligence.confidence >= 0.5 ? "Moderate" : "Limited"}</strong></div>
+              <div className="evidence-row"><span>Thermal anomalies</span><strong>{intelligence.firms_count}</strong></div>
+              <div className="evidence-row"><span>Road context</span><strong>{Number(intelligence.osm.road_count ?? 0).toLocaleString("en-IN")}</strong></div>
+              <div className="evidence-row"><span>Industrial features</span><strong>{Number(intelligence.osm.industrial_count ?? 0).toLocaleString("en-IN")}</strong></div>
+              <div className="evidence-row"><span>Construction features</span><strong>{Number(intelligence.osm.construction_count ?? 0).toLocaleString("en-IN")}</strong></div>
+              <details className="method-details"><summary>How to read this</summary><p>Context indicators support field prioritisation. They are not emission shares or regulatory source attribution.</p></details>
             </div>
+          ) : <PanelError message={intelligenceState.error ?? "Source context unavailable."} onRetry={() => retry("source-intelligence")} />}
+        </Section>
+      </div>
 
-            <div className="grid gap-5 xl:grid-cols-[1.55fr_0.9fr]">
-              <Section
-                title={`${titlePollutant(pollutant)} forecast trajectory`}
-                eyebrow="Predictive intelligence"
-                action={
-                  <span className="text-xs text-slate-400">
-                    Issued {localDate(dashboard.forecast.issue_timestamp)}
-                  </span>
-                }
-              >
-                <ForecastChart forecast={dashboard.forecast} />
-              </Section>
-              <Section
-                title="Likely contributing context"
-                eyebrow="Source screening"
-              >
-                <div className="space-y-4">
-                  {topSources.map((source) => (
-                    <div key={source.category_id}>
-                      <div className="flex items-center justify-between gap-4 text-sm">
-                        <span className="font-medium text-slate-200">
-                          {source.label}
-                        </span>
-                        <span className="text-slate-400">
-                          {Math.round((source.influence ?? 0) * 100)} indicator
-                        </span>
-                      </div>
-                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-800">
-                        <div
-                          className="h-full rounded-full bg-emerald-400"
-                          style={{
-                            width: `${Math.max(3, (source.influence ?? 0) * 100)}%`,
-                          }}
-                        />
-                      </div>
-                      <p className="mt-1.5 text-xs leading-5 text-slate-500">
-                        {source.evidence[0] ?? "Evidence unavailable"}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-                <p className="mt-5 border-t border-slate-800 pt-4 text-xs leading-5 text-slate-500">
-                  Influence indicators rank supporting context; they are not
-                  emission shares or regulatory source apportionment.
-                </p>
-              </Section>
-            </div>
-
-            <div className="mt-5 grid gap-5 xl:grid-cols-[1.45fr_1fr]">
-              <Section
-                title="Hyperlocal intervention view"
-                eyebrow="Geospatial intelligence"
-              >
-                <Suspense
-                  fallback={
-                    <div className="h-[430px] animate-pulse rounded-lg bg-slate-900" />
-                  }
-                >
-                  <OperationsMap dashboard={dashboard} />
-                </Suspense>
-              </Section>
-              <div className="grid gap-5">
-                <Section
-                  title="Recommended action queue"
-                  eyebrow="Enforcement intelligence"
-                >
-                  <div className="space-y-3">
-                    {dashboard.actions.length ? (
-                      dashboard.actions.map((action) => (
-                        <article
-                          key={`${action.rank}-${action.source_category}`}
-                          className="rounded-lg border border-slate-800 bg-slate-950/40 p-4"
-                        >
-                          <div className="flex items-start gap-3">
-                            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-emerald-400/15 text-xs font-semibold text-emerald-300">
-                              {action.rank}
-                            </span>
-                            <div>
-                              <h3 className="text-sm font-semibold text-slate-100">
-                                {action.action}
-                              </h3>
-                              <p className="mt-1 text-xs text-slate-400">
-                                {action.source_category} · {action.agency}
-                              </p>
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                <span className="data-tag">
-                                  {action.response_time}
-                                </span>
-                                <span className="data-tag">
-                                  {action.cost_tier} cost
-                                </span>
-                                {action.estimated_sensitivity_range_percent && (
-                                  <span className="data-tag">
-                                    {
-                                      action
-                                        .estimated_sensitivity_range_percent[0]
-                                    }
-                                    –
-                                    {
-                                      action
-                                        .estimated_sensitivity_range_percent[1]
-                                    }
-                                    % sensitivity
-                                  </span>
-                                )}
-                              </div>
-                              <p className="mt-3 text-xs leading-5 text-slate-500">
-                                {action.caveat}
-                              </p>
-                            </div>
-                          </div>
-                        </article>
-                      ))
-                    ) : (
-                      <p className="text-sm text-slate-400">
-                        No evidence-supported action is available right now.
-                      </p>
-                    )}
-                  </div>
-                </Section>
-                <Section
-                  title="Weather and dispersion"
-                  eyebrow="Atmospheric context"
-                >
-                  <dl className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="stat-cell">
-                      <dt>Wind speed</dt>
-                      <dd>
-                        {dashboard.map.wind.speed != null
-                          ? `${Number(dashboard.map.wind.speed).toFixed(1)} m/s`
-                          : "Unavailable"}
-                      </dd>
-                    </div>
-                    <div className="stat-cell">
-                      <dt>Wind direction</dt>
-                      <dd>
-                        {dashboard.map.wind.direction != null
-                          ? `${Number(dashboard.map.wind.direction).toFixed(0)}°`
-                          : "Unavailable"}
-                      </dd>
-                    </div>
-                    <div className="stat-cell">
-                      <dt>Spatial evidence</dt>
-                      <dd>
-                        {dashboard.map.osm_available ? "Available" : "Partial"}
-                      </dd>
-                    </div>
-                    <div className="stat-cell">
-                      <dt>Forecast source</dt>
-                      <dd>
-                        Live numerical feeds
-                      </dd>
-                    </div>
-                  </dl>
-                </Section>
-              </div>
-            </div>
-
-            <div className="mt-5 grid gap-5 xl:grid-cols-2">
-              <Section
-                title="Citizen health advisory"
-                eyebrow="Public communication"
-              >
-                <h3 className="text-xl font-semibold leading-8 text-white">
-                  {dashboard.advisory.headline}
-                </h3>
-                <p className="mt-3 text-sm leading-6 text-slate-300">
-                  {dashboard.advisory.summary}
-                </p>
-                <ul className="mt-4 space-y-3">
-                  {dashboard.advisory.actions.map((action) => (
-                    <li
-                      key={action}
-                      className="flex gap-3 text-sm leading-6 text-slate-300"
-                    >
-                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
-                      {action}
-                    </li>
-                  ))}
+      <div className="mt-4 grid gap-4 xl:grid-cols-[1.45fr_0.85fr]">
+        <Section title="Current city air-quality map" eyebrow="1 km grid" action={mapState.context ? <span className="text-xs text-slate-400">{mapState.data?.metadata.cell_count ?? 0} cells</span> : undefined}>
+          {mapState.status === "loading" && !mapState.data ? <PanelSkeleton height="h-[450px]" /> : mapState.data && mapState.context ? (
+            <Suspense fallback={<PanelSkeleton height="h-[450px]" />}>
+              <LiveOperationsMap data={mapState.data} stations={mapStations} current={mapCurrent} context={mapState.context} />
+            </Suspense>
+          ) : <PanelError message={mapState.error ?? "Map data is unavailable."} onRetry={() => retry("map")} />}
+        </Section>
+        <div className="grid content-start gap-4">
+          <Section title="Monitoring stations" eyebrow="Live coverage">
+            {stationState.status === "loading" && !stationState.data ? <PanelSkeleton height="h-52" /> : stationState.status === "ready" ? (
+              stations.length ? (
+                <ul className="space-y-2">
+                  {stations.slice(0, 5).map((station) => {
+                    const latest = station.latest[pollutant];
+                    return (
+                      <li className="station-row" key={station.station_id}>
+                        <div className="min-w-0"><p className="truncate font-medium text-slate-100" title={station.name}>{station.name}{current?.station_id === station.station_id ? <span className="ml-2 text-[10px] font-semibold uppercase text-teal-300">Used</span> : null}</p><p className="truncate text-xs text-slate-400">{station.provider} · {station.freshness.label}</p></div>
+                        <strong>{latest ? `${latest.value.toFixed(1)} µg/m³` : "Unavailable"}</strong>
+                      </li>
+                    );
+                  })}
                 </ul>
-                <p className="mt-5 border-t border-slate-800 pt-4 text-xs leading-5 text-slate-500">
-                  {dashboard.advisory.disclaimer}
-                </p>
-              </Section>
-              <Section
-                title="Data pipeline status"
-                eyebrow="Operational readiness"
-              >
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {Object.entries(dashboard.provider_status).map(
-                    ([provider, status]) => (
-                      <div
-                        key={provider}
-                        className="rounded-lg border border-slate-800 bg-slate-950/40 p-4"
-                      >
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                          {provider.replaceAll("_", " ")}
-                        </p>
-                        <p className="mt-2 text-sm font-medium text-slate-200">
-                          {status}
-                        </p>
-                      </div>
-                    ),
-                  )}
-                </div>
-                <p className="mt-5 text-xs leading-5 text-slate-500">
-                  {dashboard.disclaimer}
-                </p>
-              </Section>
-            </div>
-          </>
-        )
-      )}
+              ) : <EmptyPanel>No usable nearby PM stations. Forecast coverage remains model-based.</EmptyPanel>
+            ) : <PanelError message={stationState.error ?? "Stations unavailable."} onRetry={() => retry("stations")} />}
+          </Section>
 
-      {network && (
-        <div className="mt-5">
-          <Section
-            title="Five-city outlook"
-            eyebrow="Comparative intelligence"
-            action={
-              <span className="text-xs text-slate-500">
-                PM2.5 · next 24 hours
-              </span>
-            }
-          >
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-                <thead>
-                  <tr className="border-b border-slate-800 text-[10px] uppercase tracking-[0.13em] text-slate-500">
-                    <th className="px-3 py-3 font-semibold">City</th>
-                    <th className="px-3 py-3 font-semibold">Current</th>
-                    <th className="px-3 py-3 font-semibold">24h peak</th>
-                    <th className="px-3 py-3 font-semibold">Category</th>
-                    <th className="px-3 py-3 font-semibold">Priority</th>
-                    <th className="px-3 py-3 font-semibold">Feed</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {network.cities.map((item) => (
-                    <tr
-                      key={item.city_id}
-                      className={`border-b border-slate-800/70 ${item.city_id === cityId ? "bg-emerald-400/[0.05]" : ""}`}
-                    >
-                      <td className="px-3 py-3 font-medium text-slate-100">
-                        <button
-                          className="text-left hover:text-emerald-300"
-                          onClick={() => setCityId(item.city_id)}
-                        >
-                          {item.city_name}
-                        </button>
-                        <span className="ml-2 text-xs font-normal text-slate-500">
-                          {item.state}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 text-slate-300">
-                        {item.current != null ? `${item.current.toFixed(1)} µg/m³` : "Unavailable"}
-                      </td>
-                      <td className="px-3 py-3 text-slate-300">
-                        {item.peak_24h != null ? `${item.peak_24h.toFixed(1)} µg/m³` : "Unavailable"}
-                      </td>
-                      <td className="px-3 py-3">
-                        <span
-                          className="font-medium"
-                          style={{ color: aqiColor[item.category ?? ""] }}
-                        >
-                          {item.category ?? "Unclassified"}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 text-slate-300">
-                        {item.priority}
-                      </td>
-                      <td className="px-3 py-3 text-xs text-slate-500">Live numerical</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="mt-4 text-xs leading-5 text-slate-500">
-              {network.methodology}. Select any city row to open its full
-              operational workflow.
-            </p>
+          <Section title="Recommended intervention" eyebrow="Field action">
+            {actionState.status === "loading" && !actionState.data ? <PanelSkeleton height="h-36" /> : actionState.data?.length ? (
+              <div className="space-y-3">{actionState.data.map((action, index) => <article className="action-card" key={`${action.action}-${index}`}><span>{action.priority}</span><p>{action.action}</p></article>)}</div>
+            ) : actionState.status === "error" ? <PanelError message={actionState.error} onRetry={() => retry("actions")} /> : <EmptyPanel>No intervention is available for the current evidence.</EmptyPanel>}
           </Section>
         </div>
-      )}
+      </div>
 
-      <footer className="mt-8 flex flex-col gap-2 border-t border-slate-800 pt-5 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-        <span>
-          {dashboard?.city.station_name ??
-            selectedCity?.station_name ??
-            "AirView monitoring network"}
-        </span>
-        <span>
-          Five-city operational prototype · OpenAQ · Open-Meteo CAMS · NASA
-          FIRMS · OpenStreetMap
-        </span>
+      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+        <Section title="Citizen advisory" eyebrow="Public information">
+          {advisoryState.status === "loading" && !advisoryState.data ? <PanelSkeleton height="h-32" /> : advisoryState.data?.status === "available" ? (
+            <div><p className="text-lg font-semibold text-slate-100">Current category: {advisoryState.data.category ?? "Unclassified"}</p><p className="mt-2 text-sm leading-6 text-slate-300">{advisoryState.data.message}</p><p className="mt-4 text-xs text-slate-500">Public information only. Follow local authority and healthcare guidance.</p></div>
+          ) : advisoryState.status === "error" ? <PanelError message={advisoryState.error} onRetry={() => retry("advisory")} /> : <EmptyPanel>Advisory unavailable until current conditions are established.</EmptyPanel>}
+        </Section>
+
+        <Section title="Snapshot integrity" eyebrow="Data status">
+          <dl className="grid grid-cols-2 gap-3 text-sm">
+            <div className="stat-cell"><dt>City</dt><dd className="truncate" title={activeCity.name}>{activeCity.name}</dd></div>
+            <div className="stat-cell"><dt>Coverage</dt><dd>{coverageLabel(currentState.context?.coverage_type)}</dd></div>
+            <div className="stat-cell"><dt>Issue time</dt><dd>{localDate(currentState.context?.issue_timestamp)}</dd></div>
+            <div className="stat-cell"><dt>Snapshot</dt><dd className="font-mono text-xs">{snapshotId ?? "Loading"}</dd></div>
+          </dl>
+          <details className="method-details mt-4"><summary>Forecast methodology</summary><p>Live CAMS numerical forecast with a validation-selected persistence-residual transfer and freshness-weighted nearby-station correction where monitoring is available. The residual model was not trained on archived CAMS errors.</p></details>
+        </Section>
+      </div>
+
+      <div className="mt-4">
+        <Section title="Five-city next-24-hour watch" eyebrow="Fixed PM2.5 forecast comparison" action={networkStatus === "error" ? <button className="text-xs font-semibold text-teal-300" onClick={() => setNetworkRefresh((value) => value + 1)}>Retry</button> : undefined}>
+          {networkStatus === "loading" && !network ? <PanelSkeleton height="h-52" /> : network ? (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-left text-sm">
+                <thead><tr><th>City</th><th>Next-24h peak</th><th>Peak AQI</th><th>Peak category</th><th>Forecast priority</th><th>Issued</th></tr></thead>
+                <tbody>{network.cities.map((item) => <tr key={item.city_id}><td><button className="font-medium text-slate-100 hover:text-teal-300" onClick={() => { const city = defaultCities.find((entry) => entry.cityId === item.city_id); if (city) setActiveCity(city); }}>{item.city_name}</button><span>{item.state}</span></td><td style={{ color: item.colour ?? undefined }}>{item.value_24h == null ? "Unavailable" : `${item.value_24h.toFixed(1)} µg/m³`}</td><td>{item.aqi ?? "Unavailable"}</td><td style={{ color: item.colour ?? undefined }}>{item.category ?? "Unavailable"}</td><td>{item.priority}</td><td>{localDate(item.issue_timestamp)}</td></tr>)}</tbody>
+              </table>
+            </div>
+          ) : <PanelError message="Five-city outlook is temporarily unavailable." onRetry={() => setNetworkRefresh((value) => value + 1)} />}
+        </Section>
+      </div>
+
+      <footer className="mt-7 border-t border-slate-800 pt-4 text-xs text-slate-500">
+        AirView AI · live operational decision support · OpenStreetMap attribution remains visible on the map
       </footer>
     </div>
   );

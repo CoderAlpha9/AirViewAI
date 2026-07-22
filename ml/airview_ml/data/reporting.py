@@ -37,7 +37,9 @@ REPORT_NAMES = {
 def write_report(reports_dir: Path, name: str, payload: Any) -> Path:
     reports_dir.mkdir(parents=True, exist_ok=True)
     target = reports_dir / REPORT_NAMES.get(name, f"{name}.json")
-    target.write_text(json.dumps(serialise(payload), ensure_ascii=False, indent=2), encoding="utf-8")
+    target.write_text(
+        json.dumps(serialise(payload), ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     return target
 
 
@@ -53,4 +55,9 @@ def inventory_entry(result: SourceResult) -> dict[str, Any]:
 
 
 def empty_run(profile: str) -> dict[str, Any]:
-    return {"status": "not_ready", "profile": profile, "started_at_utc": datetime.now(timezone.utc).isoformat(), "message": "No completed data pipeline run is available yet."}
+    return {
+        "status": "not_ready",
+        "profile": profile,
+        "started_at_utc": datetime.now(timezone.utc).isoformat(),
+        "message": "No completed data pipeline run is available yet.",
+    }

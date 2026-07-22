@@ -60,7 +60,9 @@ class CityMatch:
     reason: str
 
 
-def match_city(value: str | None, state: str | None, registry: list[dict[str, object]]) -> CityMatch:
+def match_city(
+    value: str | None, state: str | None, registry: list[dict[str, object]]
+) -> CityMatch:
     target = normalise_city_name(value)
     state_target = normalise_text(state)
     exact = [
@@ -70,7 +72,11 @@ def match_city(value: str | None, state: str | None, registry: list[dict[str, ob
         and (not state_target or normalise_text(str(city["state"])) == state_target)
     ]
     if len(exact) == 1:
-        return CityMatch(str(exact[0]["slug"]), "high", "state-aware exact or configured alias match")
+        return CityMatch(
+            str(exact[0]["slug"]), "high", "state-aware exact or configured alias match"
+        )
     if not target:
         return CityMatch(None, "none", "missing city name")
-    return CityMatch(None, "review", "no safe state-aware match; fuzzy matching is deliberately not automatic")
+    return CityMatch(
+        None, "review", "no safe state-aware match; fuzzy matching is deliberately not automatic"
+    )

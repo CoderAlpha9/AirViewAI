@@ -12,7 +12,9 @@ def normalise_unit(unit: str | None) -> str:
     return (unit or "").lower().replace("µ", "u").replace("³", "3").replace("/", " ").strip()
 
 
-def convert_pollutant(value: float | None, unit: str | None, pollutant: str | None) -> UnitConversion:
+def convert_pollutant(
+    value: float | None, unit: str | None, pollutant: str | None
+) -> UnitConversion:
     if value is None:
         return UnitConversion(None, None, ["missing_value"])
     canonical_pollutant = (pollutant or "").lower()

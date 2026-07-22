@@ -19,4 +19,4 @@ def test_relative_transport_primitives_are_bounded():
 
 def test_stagnation_and_insufficient_evidence():
     assert stagnation(0, 0) > stagnation(5, 0)
-    assert tier(.9, .2) == "Insufficient evidence"
+    assert tier(0.9, 0.2) == "Insufficient evidence"

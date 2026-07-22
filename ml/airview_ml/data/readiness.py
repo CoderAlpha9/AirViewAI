@@ -2,7 +2,9 @@ from airview_ml.data.config import EligibilityThresholds
 from airview_ml.data.contracts import CityReadinessScore
 
 
-def readiness_score(city_id: str, metrics: dict[str, float], thresholds: EligibilityThresholds) -> CityReadinessScore:
+def readiness_score(
+    city_id: str, metrics: dict[str, float], thresholds: EligibilityThresholds
+) -> CityReadinessScore:
     station_count = metrics.get("active_station_count", 0)
     history_days = metrics.get("history_days", 0)
     completeness = metrics.get("hourly_completeness", 0)
@@ -36,7 +38,21 @@ def readiness_score(city_id: str, metrics: dict[str, float], thresholds: Eligibi
     if metrics.get("geometry_available", 0) == 0:
         reasons.append("unavailable geometry")
     national = station_count >= 1 and coordinate_validity > 0
-    forecast = national and history_days >= thresholds.minimum_history_days and completeness >= thresholds.minimum_hourly_completeness
-    hyperlocal = forecast and station_count >= thresholds.minimum_hyperlocal_stations and metrics.get("geometry_available", 0) > 0
-    intervention = forecast and metrics.get("spatial_feature_availability", 0) > 0 and metrics.get("population_availability", 0) > 0
-    return CityReadinessScore(city_id, score, national, forecast, hyperlocal, intervention, components, reasons)
+    forecast = (
+        national
+        and history_days >= thresholds.minimum_history_days
+        and completeness >= thresholds.minimum_hourly_completeness
+    )
+    hyperlocal = (
+        forecast
+        and station_count >= thresholds.minimum_hyperlocal_stations
+        and metrics.get("geometry_available", 0) > 0
+    )
+    intervention = (
+        forecast
+        and metrics.get("spatial_feature_availability", 0) > 0
+        and metrics.get("population_availability", 0) > 0
+    )
+    return CityReadinessScore(
+        city_id, score, national, forecast, hyperlocal, intervention, components, reasons
+    )

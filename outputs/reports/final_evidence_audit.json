@@ -1,0 +1,213 @@
+{
+  "generated_at_utc": "2026-07-22T07:02:20.9029954Z",
+  "status": "passed",
+  "earlier_claim_correction": {
+    "required": true,
+    "incorrect_claim": "The deployed models were previously described as CAMS-residual models.",
+    "verified_implementation": "They are station-persistence-residual models. Archived historical CAMS values were not present in training. The validation-selected station-persistence correction is transferred onto live CAMS during operational inference.",
+    "corrected_surfaces": [
+      "all six model metadata files",
+      "backend operational method text",
+      "frontend methodology disclosure",
+      "README.md",
+      "docs/ARCHITECTURE.md",
+      "docs/ML_METHODOLOGY.md",
+      "docs/DEMO_GUIDE.md",
+      "FINAL_DELIVERY_REPORT.md"
+    ]
+  },
+  "runtime": {
+    "scikit_learn": "1.9.0",
+    "pyarrow": "23.0.1",
+    "artifact_runtime_alignment": "All six artifacts were regenerated and loaded with scikit-learn 1.9.0. Dependency minimums now match the serializer/runtime used by the artifacts."
+  },
+  "model_evidence": {
+    "estimator_type_for_all_six_artifacts": "sklearn.pipeline.Pipeline",
+    "pipeline_steps_for_all_six_artifacts": [
+      "sklearn.impute.SimpleImputer(strategy='median', add_indicator=True)",
+      "sklearn.ensemble.HistGradientBoostingRegressor"
+    ],
+    "exact_training_target_for_all_six_artifacts": "target_residual(t,h) = observed_station(t+h) - observed_station(t)",
+    "historical_cams_values_genuinely_present_during_training": false,
+    "legacy_feature_name_note": "The exact keys camps_current and camps_target are retained for artifact compatibility. During training, both contain observed_station(t), not CAMS values.",
+    "exact_feature_names_for_each_of_the_six_artifacts": [
+      "camps_current",
+      "camps_target",
+      "pollutant_lag_1",
+      "pollutant_lag_6",
+      "pollutant_lag_24",
+      "pollutant_mean_6",
+      "pollutant_mean_24",
+      "other_pm_current",
+      "temperature_2m",
+      "relative_humidity_2m",
+      "surface_pressure",
+      "precipitation",
+      "wind_speed_10m",
+      "wind_direction_sin",
+      "wind_direction_cos",
+      "boundary_layer_height",
+      "latitude",
+      "longitude",
+      "hour_sin",
+      "hour_cos",
+      "day_of_year_sin",
+      "day_of_year_cos",
+      "month_sin",
+      "month_cos",
+      "nearby_station_residual",
+      "nearby_station_distance_km",
+      "nearby_station_age_hours",
+      "nearby_station_count",
+      "firms_count_24h",
+      "firms_frp_24h",
+      "road_count",
+      "industrial_count",
+      "construction_count",
+      "wind_relative_source_score"
+    ],
+    "exact_live_hourly_inference_formula_for_each_artifact": "forecast(i)=max(0,CAMS(i)+I[champion=hist_gradient_boosting_residual]*(i/h)*model(x_live)+station_residual*exp(-i/18)); h is the artifact horizon",
+    "exact_live_grid_inference_formula_for_each_artifact": "grid_forecast(cell,h)=max(0,CAMS(h)+I[champion=hist_gradient_boosting_residual]*model(x_live_cell)+station_residual_cell*exp(-h/18)+bounded_wind_planning_adjustment_cell)",
+    "artifacts": [
+      {
+        "pollutant": "pm2_5",
+        "horizon_hours": 24,
+        "artifact_path": "models/forecasting/global_residual/pm2_5/24/model.joblib",
+        "metadata_path": "models/forecasting/global_residual/pm2_5/24/metadata.json",
+        "feature_schema_path": "models/forecasting/global_residual/pm2_5/24/feature_schema.json",
+        "sha256": "93611953cfd31df479abc3b3de3d2291fb82573e61bed838e20bb27304e05b91",
+        "selected_champion": "persistence",
+        "hist_gradient_boosting_grouped_rmse": 64.64492045340431,
+        "persistence_grouped_rmse": 64.60876154259537
+      },
+      {
+        "pollutant": "pm2_5",
+        "horizon_hours": 48,
+        "artifact_path": "models/forecasting/global_residual/pm2_5/48/model.joblib",
+        "metadata_path": "models/forecasting/global_residual/pm2_5/48/metadata.json",
+        "feature_schema_path": "models/forecasting/global_residual/pm2_5/48/feature_schema.json",
+        "sha256": "957cd2a827009ebe9471ec5bb5e06ab826da8a0ce90329e3272e31e4a453a2cd",
+        "selected_champion": "hist_gradient_boosting_residual",
+        "hist_gradient_boosting_grouped_rmse": 66.85754667880906,
+        "persistence_grouped_rmse": 70.46381380875822
+      },
+      {
+        "pollutant": "pm2_5",
+        "horizon_hours": 72,
+        "artifact_path": "models/forecasting/global_residual/pm2_5/72/model.joblib",
+        "metadata_path": "models/forecasting/global_residual/pm2_5/72/metadata.json",
+        "feature_schema_path": "models/forecasting/global_residual/pm2_5/72/feature_schema.json",
+        "sha256": "7e85e902823059b2f5bbe905f8576eb7b331600bd1fed9003c95d91bf2d9badd",
+        "selected_champion": "hist_gradient_boosting_residual",
+        "hist_gradient_boosting_grouped_rmse": 68.76106116328332,
+        "persistence_grouped_rmse": 73.54295747109683
+      },
+      {
+        "pollutant": "pm10",
+        "horizon_hours": 24,
+        "artifact_path": "models/forecasting/global_residual/pm10/24/model.joblib",
+        "metadata_path": "models/forecasting/global_residual/pm10/24/metadata.json",
+        "feature_schema_path": "models/forecasting/global_residual/pm10/24/feature_schema.json",
+        "sha256": "35cf414aa157bbaeb024b649a6b53f08045922e3ab4184034d186a27ef2f14ab",
+        "selected_champion": "persistence",
+        "hist_gradient_boosting_grouped_rmse": 122.90796058651382,
+        "persistence_grouped_rmse": 117.88710465562008
+      },
+      {
+        "pollutant": "pm10",
+        "horizon_hours": 48,
+        "artifact_path": "models/forecasting/global_residual/pm10/48/model.joblib",
+        "metadata_path": "models/forecasting/global_residual/pm10/48/metadata.json",
+        "feature_schema_path": "models/forecasting/global_residual/pm10/48/feature_schema.json",
+        "sha256": "7a06edeb4719e742575a2be656afb55f39b5fb1c77605df628230f34e385fa94",
+        "selected_champion": "persistence",
+        "hist_gradient_boosting_grouped_rmse": 128.40072647554746,
+        "persistence_grouped_rmse": 126.91699159653116
+      },
+      {
+        "pollutant": "pm10",
+        "horizon_hours": 72,
+        "artifact_path": "models/forecasting/global_residual/pm10/72/model.joblib",
+        "metadata_path": "models/forecasting/global_residual/pm10/72/metadata.json",
+        "feature_schema_path": "models/forecasting/global_residual/pm10/72/feature_schema.json",
+        "sha256": "5d544c799b56e563f9e6a48a4943a4aea5641fdc4915e3cf94b2e772e07a9221",
+        "selected_champion": "hist_gradient_boosting_residual",
+        "hist_gradient_boosting_grouped_rmse": 130.90926513435042,
+        "persistence_grouped_rmse": 131.67429615322084
+      }
+    ]
+  },
+  "five_city_comparison": {
+    "mode": "fixed_next_24h_pm2_5_outlook",
+    "context": "next-24-hour PM2.5 forecast peak",
+    "canonical_fields": [
+      "value_24h",
+      "aqi",
+      "category",
+      "colour",
+      "priority",
+      "pollutant",
+      "horizon",
+      "issue_timestamp",
+      "valid_timestamp",
+      "snapshot_id"
+    ],
+    "derivation": "All display and decision fields are read from the same canonical 400-cell/source-enabled city snapshot used by /api/live/forecast.",
+    "current_metric_wording_removed": true,
+    "end_to_end_verifier": "passed for all five default cities"
+  },
+  "map_audit": {
+    "path_count_explanation": "Leaflet assigns leaflet-interactive to grid polygons and to SVG station/FIRMS circle markers. Therefore the total SVG path count may exceed the active grid-cell count when markers are present. The audit compares only .airview-grid-cell paths with metadata.cell_count and separately counts station and FIRMS paths.",
+    "stale_layer_prevention": "GeoJSON and marker keys include city/snapshot identity; the viewport effect removes old move handlers and dataset identity; stale panel responses are aborted or rejected by generation and context checks.",
+    "category_legend": ["Good", "Satisfactory", "Moderate", "Poor", "Very Poor", "Severe"],
+    "transparent_category_fill_verified": true,
+    "map_layers_clean": true,
+    "city_layer_counts": [
+      {"city": "Delhi NCR", "snapshot_id": "0bab8e4baa4c9505", "expected_grid_cells": 400, "rendered_grid_paths": 400, "station_paths": 0, "firms_paths": 0, "map_center": "28.64684,77.31603"},
+      {"city": "Ludhiana", "snapshot_id": "71d74d54ffc205e4", "expected_grid_cells": 400, "rendered_grid_paths": 400, "station_paths": 0, "firms_paths": 0, "map_center": "30.90280,75.80860"},
+      {"city": "Mysuru", "snapshot_id": "748de002f3ceda7a", "expected_grid_cells": 102, "rendered_grid_paths": 102, "station_paths": 0, "firms_paths": 0, "map_center": "12.30415,76.65295"},
+      {"city": "Jaipur", "snapshot_id": "faad225f83f4265a", "expected_grid_cells": 400, "rendered_grid_paths": 400, "station_paths": 0, "firms_paths": 0, "map_center": "26.91546,75.81898"},
+      {"city": "Delhi NCR", "snapshot_id": "0bab8e4baa4c9505", "expected_grid_cells": 400, "rendered_grid_paths": 400, "station_paths": 0, "firms_paths": 0, "map_center": "28.64684,77.31603"}
+    ],
+    "rapid_switch_final": {"city": "Delhi NCR", "snapshot_id": "b579542a1f652a3c", "expected_grid_cells": 400, "rendered_grid_paths": 400, "station_paths": 0, "firms_paths": 0, "map_center": "28.64684,77.31603"},
+    "live_marker_availability_note": "No station or FIRMS markers were returned by the external providers during this captured run; no marker count is fabricated. Marker and multi-station correction logic are covered by backend tests."
+  },
+  "browser_audit": {
+    "status": "passed",
+    "viewport_desktop": "1440x1000",
+    "viewport_mobile": "390x844",
+    "progressive_skeleton_observed": true,
+    "tested_city_sequence": ["Delhi NCR", "Ludhiana", "Mysuru", "Jaipur", "Delhi NCR"],
+    "rapid_switch_sequence": ["Agra", "Amritsar", "Ludhiana", "Jaipur", "Delhi NCR"],
+    "searched_cities": ["Mysuru", "Jaipur", "Pune"],
+    "pollutants_tested": ["pm2_5", "pm10"],
+    "horizons_tested_hours": [24, 48, 72],
+    "final_context": "Delhi NCR / PM10 / 72 hours",
+    "console_errors": [],
+    "failed_api_requests": [],
+    "mobile_horizontal_overflow": false,
+    "screenshots": [
+      "outputs/reports/airview-final-desktop.png",
+      "outputs/reports/airview-final-mobile.png",
+      "outputs/reports/airview-final-map.png"
+    ]
+  },
+  "validation_results": {
+    "ruff_format": "passed; 75 files already formatted",
+    "ruff_check": "passed",
+    "backend_and_ml_tests": "passed; 69/69",
+    "frontend_lint": "passed; zero warnings",
+    "frontend_typecheck": "passed",
+    "frontend_tests": "passed; 3/3",
+    "frontend_production_build": "passed; 738 modules transformed",
+    "end_to_end_verifier": "passed; 28/28",
+    "real_chrome_browser_audit": "passed"
+  },
+  "resolved_audit_failures": [
+    "A root pytest invocation without repository source paths collected zero tests; the documented repository invocation with backend and ml on PYTHONPATH passed 69/69.",
+    "Artifacts serialized with scikit-learn 1.9 warned under the previously allowed 1.6 runtime; dependencies were aligned and all six artifacts regenerated under 1.9.",
+    "PyArrow 19 could not read the archived feature parquet; the declared/runtime minimum was raised to 23 and training completed.",
+    "Panel endpoints and the five-city comparison used differently scoped snapshot cache keys; they now share the same canonical 400-cell/source-enabled snapshot.",
+    "The verifier initially found a five-city snapshot mismatch (27/28); after the canonical-cache fix it passed 28/28."
+  ]
+}

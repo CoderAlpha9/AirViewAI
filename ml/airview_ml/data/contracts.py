@@ -3,7 +3,9 @@ from datetime import datetime
 from typing import Any, Literal
 
 ValueKind = Literal["observed", "provider_derived", "airview_derived", "modelled", "proxy"]
-SourceStatus = Literal["success", "partial", "skipped", "failed", "credentials_required", "not_ready"]
+SourceStatus = Literal[
+    "success", "partial", "skipped", "failed", "credentials_required", "not_ready"
+]
 
 
 @dataclass(frozen=True)

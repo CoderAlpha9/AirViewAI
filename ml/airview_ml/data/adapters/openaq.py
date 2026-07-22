@@ -27,7 +27,9 @@ class OpenAQAdapter:
     def headers(self) -> dict[str, str]:
         return {"X-API-Key": self.api_key} if self.api_key else {}
 
-    def fetch_locations_india(self, limit: int = 1_000) -> tuple[list[dict[str, Any]], SourceResult]:
+    def fetch_locations_india(
+        self, limit: int = 1_000
+    ) -> tuple[list[dict[str, Any]], SourceResult]:
         if not self.api_key:
             return [], SourceResult(
                 source=self.source,
@@ -77,7 +79,8 @@ class OpenAQAdapter:
     def probe_archive(self) -> SourceResult:
         try:
             _, cache_path, _ = self.client.get_text(
-                "openaq_archive", f"{self.archive_url}/?list-type=2&prefix=records/csv.gz/&delimiter=/&max-keys=1"
+                "openaq_archive",
+                f"{self.archive_url}/?list-type=2&prefix=records/csv.gz/&delimiter=/&max-keys=1",
             )
         except Exception as exc:
             return SourceResult(
@@ -133,15 +136,30 @@ class OpenAQAdapter:
                 if key:
                     day = _archive_day(key)
                     if day and start <= day <= end:
-                        keys.append({"key": key, "size": int(item.get("size") or 0), "date": day.isoformat(), "etag": item.get("etag")})
+                        keys.append(
+                            {
+                                "key": key,
+                                "size": int(item.get("size") or 0),
+                                "date": day.isoformat(),
+                                "etag": item.get("etag"),
+                            }
+                        )
         return keys
 
-    def audit_archive_location(self, location_id: int, start: date, end: date, location: dict[str, Any] | None = None) -> dict[str, Any]:
+    def audit_archive_location(
+        self, location_id: int, start: date, end: date, location: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Inspect only S3 listings. No archive object is downloaded by this operation."""
         files = self.list_archive_files(location_id, start, end)
         months = sorted({item["date"][:7] for item in files})
         sensors = (location or {}).get("sensors", [])
-        pollutants = sorted({str((sensor.get("parameter") or {}).get("name") or "").lower() for sensor in sensors if (sensor.get("parameter") or {}).get("name")})
+        pollutants = sorted(
+            {
+                str((sensor.get("parameter") or {}).get("name") or "").lower()
+                for sensor in sensors
+                if (sensor.get("parameter") or {}).get("name")
+            }
+        )
         return {
             "location_id": location_id,
             "requested_start": start.isoformat(),
@@ -167,13 +185,21 @@ class OpenAQAdapter:
             root = ET.fromstring(text)
             namespace = "{http://s3.amazonaws.com/doc/2006-03-01/}"
             for node in root.findall(f"{namespace}Contents"):
-                items.append({"key": node.findtext(f"{namespace}Key"), "size": int(node.findtext(f"{namespace}Size") or 0), "etag": node.findtext(f"{namespace}ETag")})
+                items.append(
+                    {
+                        "key": node.findtext(f"{namespace}Key"),
+                        "size": int(node.findtext(f"{namespace}Size") or 0),
+                        "etag": node.findtext(f"{namespace}ETag"),
+                    }
+                )
             truncated = root.findtext(f"{namespace}IsTruncated") == "true"
             token = root.findtext(f"{namespace}NextContinuationToken")
             if not truncated or not token:
                 return items
 
-    def download_archive_file(self, key: str, expected_size: int | None = None) -> tuple[bytes, str]:
+    def download_archive_file(
+        self, key: str, expected_size: int | None = None
+    ) -> tuple[bytes, str]:
         url = f"{self.archive_url}/{key}"
         path = self.client.cache_root / "openaq_archive" / key
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -182,12 +208,18 @@ class OpenAQAdapter:
             self.decompress_csv(content)  # verified cache entries are safe to resume from
             return content, str(path)
         partial = path.with_suffix(path.suffix + ".partial")
-        response = __import__("httpx").get(url, timeout=__import__("httpx").Timeout(connect=8, read=60, write=60, pool=8))
+        response = __import__("httpx").get(
+            url, timeout=__import__("httpx").Timeout(connect=8, read=60, write=60, pool=8)
+        )
         response.raise_for_status()
         partial.write_bytes(response.content)
         if expected_size is not None and partial.stat().st_size != expected_size:
-            raise RuntimeError(f"archive size mismatch for {key}: expected {expected_size}, got {partial.stat().st_size}")
-        self.decompress_csv(partial.read_bytes())  # gzip and CSV integrity validation before promotion
+            raise RuntimeError(
+                f"archive size mismatch for {key}: expected {expected_size}, got {partial.stat().st_size}"
+            )
+        self.decompress_csv(
+            partial.read_bytes()
+        )  # gzip and CSV integrity validation before promotion
         partial.replace(path)
         return response.content, str(path)
 
@@ -203,7 +235,27 @@ class OpenAQAdapter:
             timestamp = pd.to_datetime(record.get("datetime"), utc=True, errors="coerce")
             if pd.isna(timestamp):
                 continue
-            rows.append({"city_id": mapped_location.get("city_id"), "state_id": mapped_location.get("state"), "station_id": mapped_location["station_id"], "station_name": mapped_location.get("station_name"), "sensor_id": f"openaq-{record.get('sensors_id')}", "timestamp_utc": timestamp, "pollutant": pollutant, "value": conversion.value_canonical, "unit": conversion.unit_canonical, "value_original": value, "unit_original": record.get("units"), "latitude": record.get("lat"), "longitude": record.get("lon"), "source": "openaq_archive", "provider": "OpenAQ", "quality_flags": conversion.flags, "provenance_id": mapped_location["location_id"]})
+            rows.append(
+                {
+                    "city_id": mapped_location.get("city_id"),
+                    "state_id": mapped_location.get("state"),
+                    "station_id": mapped_location["station_id"],
+                    "station_name": mapped_location.get("station_name"),
+                    "sensor_id": f"openaq-{record.get('sensors_id')}",
+                    "timestamp_utc": timestamp,
+                    "pollutant": pollutant,
+                    "value": conversion.value_canonical,
+                    "unit": conversion.unit_canonical,
+                    "value_original": value,
+                    "unit_original": record.get("units"),
+                    "latitude": record.get("lat"),
+                    "longitude": record.get("lon"),
+                    "source": "openaq_archive",
+                    "provider": "OpenAQ",
+                    "quality_flags": conversion.flags,
+                    "provenance_id": mapped_location["location_id"],
+                }
+            )
         return pd.DataFrame(rows)
 
 

@@ -14,4 +14,3 @@ def load_artifact(source: Path) -> Any:
     if not source.is_file():
         raise FileNotFoundError(f"Model artifact not found: {source}")
     return joblib.load(source)
-

@@ -1,40 +1,18 @@
 digraph AirView {
   graph [rankdir=LR, bgcolor="transparent", pad="0.25", nodesep="0.42", ranksep="0.65", splines=ortho, fontname="Arial"];
   node [shape=box, style="rounded,filled", fontname="Arial", fontsize=10, margin="0.16,0.10", color="#24494a", fontcolor="#EAF6F2", fillcolor="#0D2627", penwidth=1.2];
-  edge [color="#59D7B3", penwidth=1.3, arrowsize=0.7, fontname="Arial", fontsize=8, fontcolor="#426B69"];
+  edge [color="#59D7B3", penwidth=1.3, arrowsize=0.7];
 
-  subgraph cluster_sources {
-    label="CURRENT AND HISTORICAL EVIDENCE"; labelloc=t; labeljust=l; fontsize=11; fontcolor="#123B3B"; color="#BFDAD4"; style="rounded,filled"; fillcolor="#F6FBF9";
-    openaq [label="OpenAQ / CAAQMS\nstation observations"];
-    cams [label="Open-Meteo CAMS\nPM2.5 / PM10 outlook"];
-    meteo [label="Open-Meteo weather\nwind, rain, boundary layer"];
-    firms [label="NASA FIRMS\nthermal anomalies"];
-    osm [label="OpenStreetMap\nland-use and source proxies"];
-    archive [label="Validated historical archive\n866k observations + replay"];
-  }
+  stations [label="CPCB / OpenAQ\nstation observations"];
+  cams [label="Open-Meteo CAMS\ncurrent + outlook"];
+  context [label="Weather / FIRMS / OSM\noperational context"];
+  snapshot [label="Canonical snapshot\ncity + pollutant + horizon + issue"];
+  transfer [label="Persistence-residual transfer\n(no CAMS values in training)"];
+  grid [label="Current-category grid\nseparate horizon forecast"];
+  panels [label="Independent live panels\nstale-response rejection"];
+  compare [label="Fixed next-24h PM2.5 comparison\none context per city"];
 
-  subgraph cluster_backend {
-    label="AIRVIEW OPERATIONAL INTELLIGENCE"; labelloc=t; labeljust=l; fontsize=11; fontcolor="#DFFAF0"; color="#173D3E"; style="rounded,filled"; fillcolor="#071718";
-    ingest [label="Live provider fusion\nTTL cache, retries, freshness", fillcolor="#123536"];
-    forecast [label="24 / 48 / 72 h forecast\nCAMS + station bias + Ridge", fillcolor="#123536"];
-    grid [label="1 km intervention grid\ntransparent downscaling", fillcolor="#123536"];
-    source [label="Source influence screening\nweather + FIRMS + OSM", fillcolor="#123536"];
-    action [label="Priority and intervention engine\nconfidence + scenario sensitivity", fillcolor="#123536"];
-    advisory [label="Citizen advisory engine\nEnglish / Hindi / Punjabi", fillcolor="#123536"];
-    fallback [label="Validated replay fallback\nclearly labelled, never fake live", fillcolor="#2C3020", color="#7D7A31"];
-  }
-
-  subgraph cluster_product {
-    label="SMART-CITY DECISION ENDPOINT"; labelloc=t; labeljust=l; fontsize=11; fontcolor="#123B3B"; color="#BFDAD4"; style="rounded,filled"; fillcolor="#F6FBF9";
-    api [label="FastAPI operational contract\n/api/operations/*", fillcolor="#134A45"];
-    dashboard [label="AirView command dashboard\nforecast, map, sources, actions", fillcolor="#134A45"];
-    citizen [label="Regional-language advisory\npublic information", fillcolor="#134A45"];
-    compare [label="Five-city comparison\nshared readiness view", fillcolor="#134A45"];
-  }
-
-  openaq -> ingest; cams -> ingest; meteo -> ingest; firms -> ingest; osm -> ingest; archive -> fallback;
-  ingest -> forecast; forecast -> grid; ingest -> source; source -> action; forecast -> action; action -> advisory;
-  ingest -> fallback [style=dashed, color="#9A8C3A", label="provider failure"];
-  forecast -> api; grid -> api; source -> api; action -> api; advisory -> api; fallback -> api;
-  api -> dashboard; api -> citizen; api -> compare;
+  stations -> snapshot; cams -> snapshot; context -> snapshot;
+  snapshot -> transfer; transfer -> grid; snapshot -> panels; grid -> panels;
+  transfer -> compare; snapshot -> compare;
 }

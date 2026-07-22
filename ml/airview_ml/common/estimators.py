@@ -22,4 +22,3 @@ def create_regressor(
 
     sklearn_kwargs = {"random_state": random_state, **kwargs}
     return HistGradientBoostingRegressor(**sklearn_kwargs)
-

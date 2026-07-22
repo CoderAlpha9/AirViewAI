@@ -6,6 +6,7 @@ import asyncio
 import csv
 import io
 import math
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -42,6 +43,9 @@ class TTLCache:
 
 cache = TTLCache()
 
+DATA_GOV_RESOURCE_ID = "3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69"
+USER_AGENT = "AirViewAI/0.2 (urban-air-quality-research)"
+
 
 async def _json_get(
     url: str,
@@ -59,14 +63,191 @@ async def _json_get(
                 response = await client.get(url, params=params, headers=headers)
                 response.raise_for_status()
                 return response.json()
-            except (
-                Exception
-            ) as exc:  # provider errors are returned as availability metadata upstream
+            except httpx.HTTPStatusError as exc:
+                # Invalid requests and unavailable credentials will not improve on retry.
+                # Rate limits remain retryable because providers can clear them quickly.
+                last = exc
+                if 400 <= exc.response.status_code < 500 and exc.response.status_code != 429:
+                    raise
+                if attempt + 1 < attempts:
+                    await asyncio.sleep(0.35 * (attempt + 1))
+            except Exception as exc:  # availability metadata is assembled upstream
                 last = exc
                 if attempt + 1 < attempts:
                     await asyncio.sleep(0.35 * (attempt + 1))
     assert last is not None
     raise last
+
+
+async def _text_get(
+    url: str,
+    *,
+    headers: dict[str, str] | None = None,
+    timeout_seconds: float = 18,
+    attempts: int = 2,
+) -> str:
+    last: Exception | None = None
+    timeout = httpx.Timeout(connect=5, read=timeout_seconds, write=10, pool=5)
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+        for attempt in range(attempts):
+            try:
+                response = await client.get(url, headers=headers)
+                response.raise_for_status()
+                return response.text
+            except Exception as exc:
+                last = exc
+                if attempt + 1 < attempts:
+                    await asyncio.sleep(0.4 * (attempt + 1))
+    assert last is not None
+    raise last
+
+
+async def _json_post(
+    url: str,
+    *,
+    data: dict[str, str],
+    headers: dict[str, str] | None = None,
+    timeout_seconds: float = 30,
+    attempts: int = 2,
+) -> dict[str, Any] | list[Any]:
+    last: Exception | None = None
+    timeout = httpx.Timeout(connect=6, read=timeout_seconds, write=10, pool=6)
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+        for attempt in range(attempts):
+            try:
+                response = await client.post(url, data=data, headers=headers)
+                response.raise_for_status()
+                return response.json()
+            except Exception as exc:
+                last = exc
+                if attempt + 1 < attempts:
+                    await asyncio.sleep(0.5 * (attempt + 1))
+    assert last is not None
+    raise last
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _slug(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+
+
+async def nominatim_city_search(query: str, limit: int = 5) -> list[dict[str, Any]]:
+    """Resolve Indian settlements with Nominatim, including AOI geometry when available."""
+    key = f"nominatim:{_slug(query)}:{limit}"
+    cached = await cache.get(key)
+    if cached is not None:
+        return cached
+    payload = await _json_get(
+        "https://nominatim.openstreetmap.org/search",
+        params={
+            "q": query,
+            "countrycodes": "in",
+            "format": "jsonv2",
+            "addressdetails": 1,
+            "polygon_geojson": 1,
+            "limit": max(1, min(limit, 10)),
+        },
+        headers={"User-Agent": USER_AGENT},
+        timeout_seconds=12,
+        attempts=3,
+    )
+    rows = payload if isinstance(payload, list) else []
+    await cache.set(key, rows, 86400)
+    return rows
+
+
+async def openaq_nearby_locations(
+    latitude: float, longitude: float, radius_km: float = 50, limit: int = 100
+) -> list[dict[str, Any]]:
+    """Discover OpenAQ locations near a coordinate; measurements remain provider data."""
+    settings = get_settings()
+    if not settings.openaq_api_key:
+        raise RuntimeError("OPENAQ_API_KEY is not configured")
+    # OpenAQ v3 caps coordinate searches at 25 km.
+    radius_m = int(max(1000, min(radius_km * 1000, 25000)))
+    key = f"openaq-locations:{latitude:.4f}:{longitude:.4f}:{radius_m}:{limit}"
+    cached = await cache.get(key)
+    if cached is not None:
+        return cached
+    payload = await _json_get(
+        "https://api.openaq.org/v3/locations",
+        params={
+            "coordinates": f"{latitude},{longitude}",
+            "radius": radius_m,
+            "limit": max(1, min(limit, 1000)),
+        },
+        headers={"X-API-Key": settings.openaq_api_key},
+        timeout_seconds=18,
+        attempts=3,
+    )
+    rows = payload.get("results", []) if isinstance(payload, dict) else []
+    await cache.set(key, rows, 900)
+    return rows
+
+
+async def cpcb_data_gov_stations(city_name: str, limit: int = 500) -> list[dict[str, Any]]:
+    """Fetch current CAAQMS records from the official Data.gov.in CPCB resource."""
+    settings = get_settings()
+    if not settings.data_gov_in_api_key:
+        raise RuntimeError("DATA_GOV_IN_API_KEY is not configured")
+    key = f"cpcb:{_slug(city_name)}:{limit}"
+    cached = await cache.get(key)
+    if cached is not None:
+        return cached
+    payload = await _json_get(
+        f"https://api.data.gov.in/resource/{DATA_GOV_RESOURCE_ID}",
+        params={
+            "api-key": settings.data_gov_in_api_key,
+            "format": "json",
+            "limit": max(1, min(limit, 1000)),
+            "filters[city]": city_name,
+        },
+        timeout_seconds=20,
+        attempts=3,
+    )
+    records = payload.get("records", []) if isinstance(payload, dict) else []
+    await cache.set(key, records, 300)
+    return records
+
+
+async def osm_city_context(south: float, west: float, north: float, east: float) -> dict[str, Any]:
+    """Fetch bounded road/industrial/land-use evidence from Overpass."""
+    key = f"overpass:{south:.3f}:{west:.3f}:{north:.3f}:{east:.3f}"
+    cached = await cache.get(key)
+    if cached is not None:
+        return cached
+    query = (
+        f"[out:json][timeout:25];(way[highway]({south},{west},{north},{east});"
+        f'way[landuse~"industrial|construction|commercial"]({south},{west},{north},{east});'
+        f'node[amenity~"hospital|clinic|school"]({south},{west},{north},{east}););'
+        "out tags center 3000;"
+    )
+    payload = await _json_post(
+        "https://overpass-api.de/api/interpreter",
+        data={"data": query},
+        headers={"User-Agent": USER_AGENT},
+        timeout_seconds=30,
+        attempts=2,
+    )
+    elements = payload.get("elements", []) if isinstance(payload, dict) else []
+    tags = [item.get("tags", {}) for item in elements]
+    value = {
+        "retrieved_at_utc": _utc_now().isoformat(),
+        "road_count": sum("highway" in tag for tag in tags),
+        "industrial_count": sum(tag.get("landuse") == "industrial" for tag in tags),
+        "construction_count": sum(tag.get("landuse") == "construction" for tag in tags),
+        "commercial_count": sum(tag.get("landuse") == "commercial" for tag in tags),
+        "sensitive_location_count": sum(
+            tag.get("amenity") in {"hospital", "clinic", "school"} for tag in tags
+        ),
+        "feature_count": len(elements),
+        "provider": "OpenStreetMap/Overpass",
+    }
+    await cache.set(key, value, 86400)
+    return value
 
 
 async def open_meteo_air_quality(
@@ -150,6 +331,36 @@ async def openaq_recent(location_id: int, hours: int = 168) -> dict[str, Any]:
     end = datetime.now(timezone.utc)
     start = end - timedelta(hours=hours)
 
+    latest: dict[str, dict[str, Any]] = {}
+    results = latest_payload.get("results", []) if isinstance(latest_payload, dict) else []
+    for item in results:
+        sensor_id = item.get("sensorsId") or item.get("sensorId") or item.get("sensors_id")
+        parameter = sensor_map.get(int(sensor_id)) if sensor_id is not None else None
+        if not parameter:
+            continue
+        dt = item.get("datetime") or {}
+        stamp = dt.get("utc") if isinstance(dt, dict) else item.get("datetime")
+        try:
+            observed = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+            if observed.tzinfo is None:
+                observed = observed.replace(tzinfo=timezone.utc)
+        except (TypeError, ValueError):
+            continue
+        if end - observed.astimezone(timezone.utc) > timedelta(hours=48):
+            continue
+        latest[parameter] = {
+            "value": item.get("value"),
+            "timestamp_utc": stamp,
+            "sensor_id": sensor_id,
+        }
+
+    fresh_parameters = set(latest)
+    fresh_sensor_map = {
+        sensor_id: parameter
+        for sensor_id, parameter in sensor_map.items()
+        if parameter in fresh_parameters
+    }
+
     async def history(sensor_id: int, parameter: str) -> tuple[str, list[dict[str, Any]]]:
         try:
             payload = await _json_get(
@@ -167,26 +378,12 @@ async def openaq_recent(location_id: int, hours: int = 168) -> dict[str, Any]:
             return parameter, []
 
     history_results = await asyncio.gather(
-        *(history(sensor_id, parameter) for sensor_id, parameter in sensor_map.items())
+        *(history(sensor_id, parameter) for sensor_id, parameter in fresh_sensor_map.items())
     )
     histories: dict[str, list[dict[str, Any]]] = {}
     for parameter, rows in history_results:
         histories.setdefault(parameter, []).extend(rows)
 
-    latest: dict[str, dict[str, Any]] = {}
-    results = latest_payload.get("results", []) if isinstance(latest_payload, dict) else []
-    for item in results:
-        sensor_id = item.get("sensorsId") or item.get("sensorId") or item.get("sensors_id")
-        parameter = sensor_map.get(int(sensor_id)) if sensor_id is not None else None
-        if not parameter:
-            continue
-        dt = item.get("datetime") or {}
-        stamp = dt.get("utc") if isinstance(dt, dict) else item.get("datetime")
-        latest[parameter] = {
-            "value": item.get("value"),
-            "timestamp_utc": stamp,
-            "sensor_id": sensor_id,
-        }
     value = {"latest": latest, "history": histories, "sensor_map": sensor_map}
     await cache.set(key, value, 300)
     return value
@@ -227,12 +424,9 @@ async def firms_near_real_time(
         return cached
     bbox = f"{longitude - radius_degrees},{latitude - radius_degrees},{longitude + radius_degrees},{latitude + radius_degrees}"
     url = f"https://firms.modaps.eosdis.nasa.gov/api/area/csv/{settings.nasa_firms_map_key}/VIIRS_SNPP_NRT/{bbox}/1"
-    timeout = httpx.Timeout(connect=5, read=18, write=10, pool=5)
-    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-        response = await client.get(url)
-        response.raise_for_status()
+    text = await _text_get(url, timeout_seconds=18, attempts=3)
     rows: list[dict[str, Any]] = []
-    for row in csv.DictReader(io.StringIO(response.text)):
+    for row in csv.DictReader(io.StringIO(text)):
         stamp = _parse_firms_time(row)
         if stamp is None:
             continue

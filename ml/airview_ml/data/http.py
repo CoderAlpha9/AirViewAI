@@ -20,7 +20,12 @@ class CachedHttpClient:
     @property
     def timeout(self) -> httpx.Timeout:
         """Use explicit phase limits so slow public APIs fail predictably."""
-        return httpx.Timeout(connect=min(self.timeout_seconds, 8), read=self.timeout_seconds, write=self.timeout_seconds, pool=min(self.timeout_seconds, 8))
+        return httpx.Timeout(
+            connect=min(self.timeout_seconds, 8),
+            read=self.timeout_seconds,
+            write=self.timeout_seconds,
+            pool=min(self.timeout_seconds, 8),
+        )
 
     def _cache_path(self, source: str, url: str, params: dict[str, Any] | None) -> Path:
         identity = json.dumps({"url": url, "params": params or {}}, sort_keys=True, default=str)

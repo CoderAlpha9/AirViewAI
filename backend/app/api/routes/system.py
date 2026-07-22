@@ -19,9 +19,9 @@ async def project_info() -> ProjectInfoResponse:
     return ProjectInfoResponse(
         name=settings.project_name,
         problem_statement=settings.problem_statement,
-        implementation_stage="Operational five-city prototype with live forecast feeds and validated replay fallback",
+        implementation_stage="Operational Indian-city prototype with live numerical forecast feeds",
         planned_modules=[
-            "Live and historical data fusion",
+            "Live provider fusion",
             "Spatial-temporal feature engineering",
             "AQI forecasting",
             "Hotspot detection",

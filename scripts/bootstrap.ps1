@@ -16,7 +16,7 @@ function Assert-NativeCommandSucceeded {
 
 if (-not $SkipBackend) {
     $VirtualEnvironment = Join-Path $RepositoryRoot ".venv"
-    py -3.13 -m venv $VirtualEnvironment
+    py -3 -m venv $VirtualEnvironment
     Assert-NativeCommandSucceeded "Python virtual environment creation"
     & (Join-Path $VirtualEnvironment "Scripts\python.exe") -m pip install --upgrade pip
     Assert-NativeCommandSucceeded "pip upgrade"

@@ -1,4 +1,5 @@
 """Safe, location-independent dotenv discovery for AirView commands."""
+
 from __future__ import annotations
 
 import os
@@ -25,5 +26,14 @@ def load_environment(root: Path | None = None) -> Path | None:
 
 def credential_status(root: Path | None = None) -> dict[str, object]:
     path = load_environment(root)
-    names = ["DATA_GOV_IN_API_KEY", "OPENAQ_API_KEY", "NASA_FIRMS_MAP_KEY", "COPERNICUS_CLIENT_ID", "COPERNICUS_CLIENT_SECRET"]
-    return {"environment_file": str(path) if path else None, "credentials": {name: {"configured": bool(os.getenv(name))} for name in names}}
+    names = [
+        "DATA_GOV_IN_API_KEY",
+        "OPENAQ_API_KEY",
+        "NASA_FIRMS_MAP_KEY",
+        "COPERNICUS_CLIENT_ID",
+        "COPERNICUS_CLIENT_SECRET",
+    ]
+    return {
+        "environment_file": str(path) if path else None,
+        "credentials": {name: {"configured": bool(os.getenv(name))} for name in names},
+    }

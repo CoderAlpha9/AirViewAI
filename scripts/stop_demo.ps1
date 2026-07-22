@@ -18,7 +18,7 @@ $Ids = @(
 foreach ($Id in $Ids) {
     $Process = Get-Process -Id $Id -ErrorAction SilentlyContinue
     if ($Process) {
-        Stop-Process -Id $Id -Force
+        Stop-Process -Id $Id -Force -ErrorAction SilentlyContinue
         Write-Host "Stopped AirView demo process $Id ($($Process.ProcessName))."
     }
 }

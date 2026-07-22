@@ -71,19 +71,29 @@ class OpenMeteoAdapter:
                 error=str(exc),
                 value_kind="modelled",
             )
-        return rows, SourceResult(
-            source=self.source,
-            status="success",
-            retrieved_at_utc=datetime.now(timezone.utc),
-            row_count=len(rows),
-            cache_path=str(cache_path),
-            date_range={"start": rows[0]["observed_at_utc"] if rows else None, "end": rows[-1]["observed_at_utc"] if rows else None},
-            geographic_coverage=f"coordinate-level weather for {location_id}",
-            variables=list(payload.get("hourly", {}).keys()),
-            official_url=self.official_url,
-            licence="Open-Meteo terms and upstream model attribution",
-            processing_steps=["coordinate-level request", "UTC alignment", "provider unit preservation"],
-            value_kind=value_kind,  # Open-Meteo data are reanalysis/model output, not station observations.
+        return (
+            rows,
+            SourceResult(
+                source=self.source,
+                status="success",
+                retrieved_at_utc=datetime.now(timezone.utc),
+                row_count=len(rows),
+                cache_path=str(cache_path),
+                date_range={
+                    "start": rows[0]["observed_at_utc"] if rows else None,
+                    "end": rows[-1]["observed_at_utc"] if rows else None,
+                },
+                geographic_coverage=f"coordinate-level weather for {location_id}",
+                variables=list(payload.get("hourly", {}).keys()),
+                official_url=self.official_url,
+                licence="Open-Meteo terms and upstream model attribution",
+                processing_steps=[
+                    "coordinate-level request",
+                    "UTC alignment",
+                    "provider unit preservation",
+                ],
+                value_kind=value_kind,  # Open-Meteo data are reanalysis/model output, not station observations.
+            ),
         )
 
     @staticmethod
@@ -96,12 +106,18 @@ class OpenMeteoAdapter:
             rows.append(
                 {
                     "location_id": location_id,
-                    "observed_at_utc": datetime.fromisoformat(time_value).replace(tzinfo=timezone.utc).isoformat(),
+                    "observed_at_utc": datetime.fromisoformat(time_value)
+                    .replace(tzinfo=timezone.utc)
+                    .isoformat(),
                     "source_timezone": payload.get("timezone", "UTC"),
                     "source_model": payload.get("timezone_abbreviation"),
                     "value_kind": "modelled",
                     "units": units,
-                    **{key: values[index] if index < len(values) else None for key, values in hourly.items() if key != "time"},
+                    **{
+                        key: values[index] if index < len(values) else None
+                        for key, values in hourly.items()
+                        if key != "time"
+                    },
                 }
             )
         return rows

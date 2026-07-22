@@ -1,13 +1,29 @@
 """Indian National AQI pollutant sub-index configuration (CPCB NAQI, 2014)."""
+
 from __future__ import annotations
 
 from typing import Literal
 
 # PM breakpoints are 24-hour concentrations in µg/m³. Concentration forecasts stay
 # separate; callers must only derive this sub-index when the averaging window is valid.
-PM25 = ((0, 30, 0, 50), (31, 60, 51, 100), (61, 90, 101, 200), (91, 120, 201, 300), (121, 250, 301, 400), (251, 500, 401, 500))
-PM10 = ((0, 50, 0, 50), (51, 100, 51, 100), (101, 250, 101, 200), (251, 350, 201, 300), (351, 430, 301, 400), (431, 600, 401, 500))
+PM25 = (
+    (0, 30, 0, 50),
+    (31, 60, 51, 100),
+    (61, 90, 101, 200),
+    (91, 120, 201, 300),
+    (121, 250, 301, 400),
+    (251, 500, 401, 500),
+)
+PM10 = (
+    (0, 50, 0, 50),
+    (51, 100, 51, 100),
+    (101, 250, 101, 200),
+    (251, 350, 201, 300),
+    (351, 430, 301, 400),
+    (431, 600, 401, 500),
+)
 Category = Literal["Good", "Satisfactory", "Moderate", "Poor", "Very Poor", "Severe"]
+
 
 def sub_index(value: float | None, pollutant: str, unit: str = "ug/m3") -> int | None:
     if value is None or unit.lower().replace("³", "3") not in {"ug/m3", "µg/m3"}:
@@ -17,6 +33,7 @@ def sub_index(value: float | None, pollutant: str, unit: str = "ug/m3") -> int |
         if lo <= value <= hi:
             return round((ihi - ilo) / (hi - lo) * (value - lo) + ilo)
     return None
+
 
 def category(index: int | None) -> Category | None:
     if index is None:

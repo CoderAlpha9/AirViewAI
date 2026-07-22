@@ -2,6 +2,7 @@
 .env
 .env.local
 !.env.example
+.demo-processes.json
 
 # Python
 __pycache__/
@@ -25,6 +26,8 @@ ml/artifacts/*
 outputs/figures/*
 outputs/metrics/*
 outputs/reports/*
+!outputs/reports/final_evidence_audit.json
+outputs/logs/*
 !**/.gitkeep
 
 # Local persistence and OS/editor files
