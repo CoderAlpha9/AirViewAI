@@ -117,6 +117,23 @@ Open:
 - Dashboard alias: `http://127.0.0.1:5173/dashboard`
 - API documentation: `http://127.0.0.1:8000/docs`
 
+### Run services separately
+
+From the repository root, activate the virtual environment and start the API:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m uvicorn backend.app.main:app --app-dir backend --host 127.0.0.1 --port 8000 --reload
+```
+
+In a second terminal, start the frontend. `VITE_API_BASE_URL` is optional and defaults
+to `http://127.0.0.1:8000/api`.
+
+```powershell
+$env:VITE_API_BASE_URL = "http://127.0.0.1:8000/api"
+npm --prefix frontend run dev -- --host 127.0.0.1 --port 5173
+```
+
 ### 4. Verify the demo
 
 ```powershell
@@ -144,7 +161,7 @@ The scripts use a demo-specific process state file and do not stop unrelated Pyt
 Example:
 
 ```text
-GET /api/operations/dashboard?city_id=delhi-ncr&pollutant=pm2_5&horizon=72&language=en&mode=live
+GET /api/operations/dashboard?city_id=delhi-ncr&pollutant=pm2_5&horizon=72&language=en
 ```
 
 Supported values:

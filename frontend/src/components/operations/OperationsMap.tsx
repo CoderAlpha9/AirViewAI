@@ -1,6 +1,8 @@
 import "leaflet/dist/leaflet.css";
 
 import { CircleMarker, MapContainer, Popup, Rectangle, TileLayer, Tooltip } from "react-leaflet";
+import { useEffect } from "react";
+import { useMap } from "react-leaflet";
 
 import type { OperationsDashboard } from "../../api/operations";
 
@@ -13,6 +15,15 @@ const categoryColor: Record<string, string> = {
   Severe: "#8b2e4f",
 };
 
+function RecenterMap({ center, bounds }: { center: [number, number]; bounds: [[number, number], [number, number]][] }) {
+  const map = useMap();
+  useEffect(() => {
+    if (bounds.length) map.fitBounds(bounds.flat(), { padding: [24, 24], maxZoom: 12 });
+    else map.setView(center, 12);
+  }, [map, center, bounds]);
+  return null;
+}
+
 export function OperationsMap({ dashboard }: { dashboard: OperationsDashboard }) {
   const { map } = dashboard;
   const center: [number, number] = [map.station.latitude, map.station.longitude];
@@ -20,6 +31,7 @@ export function OperationsMap({ dashboard }: { dashboard: OperationsDashboard })
     <div>
       <div className="h-[430px] overflow-hidden rounded-lg border border-slate-700/80" aria-label="Air-quality intervention map">
         <MapContainer center={center} zoom={12} scrollWheelZoom className="h-full w-full">
+          <RecenterMap center={center} bounds={map.grid.map((cell) => cell.bounds)} />
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

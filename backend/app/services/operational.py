@@ -1090,7 +1090,7 @@ async def build_dashboard(
     horizon = max(24, min(int(horizon), 72))
     city = CITIES[city_id]
     if force_demo:
-        return _historical_replay(city, pollutant, horizon, language)
+        raise ValueError("Historical replay is not available from the operational API")
     try:
         aq_task = open_meteo_air_quality(city.latitude, city.longitude, 120)
         weather_task = open_meteo_weather(city.latitude, city.longitude, 120)
@@ -1190,7 +1190,10 @@ async def build_dashboard(
             "disclaimer": "Operational prototype forecast. Source influence is screening, not regulatory source apportionment; intervention effects are sensitivity estimates, not causal claims.",
         }
     except Exception as exc:
-        return _historical_replay(city, pollutant, horizon, language, str(exc))
+        # Historical artifacts are validation inputs only. Returning one here would
+        # make stale evidence look operational, so callers receive an explicit
+        # unavailable state instead.
+        raise RuntimeError("Live operational data is temporarily unavailable") from exc
 
 
 def city_list() -> list[dict[str, Any]]:
@@ -1211,19 +1214,6 @@ async def build_network_overview(mode: str = "live") -> dict[str, Any]:
     """Return a compact five-city comparison without invoking the full heavy workflow."""
 
     async def one(city: CityConfig) -> dict[str, Any]:
-        if mode == "demo":
-            replay = _historical_replay(city, "pm2_5", 24, "en")
-            return {
-                "city_id": city.city_id,
-                "city_name": city.name,
-                "state": city.state,
-                "current": replay["current"]["value"],
-                "peak_24h": replay["forecast"]["peak"]["value"],
-                "category": replay["forecast"]["peak"]["category"],
-                "priority": replay["intelligence"]["priority"],
-                "mode": "historical_replay",
-                "timestamp_utc": replay["forecast"]["issue_timestamp"],
-            }
         try:
             payload = await open_meteo_air_quality(city.latitude, city.longitude, 48)
             current = _latest_observation("pm2_5", None, payload)
@@ -1260,17 +1250,16 @@ async def build_network_overview(mode: str = "live") -> dict[str, Any]:
                 "timestamp_utc": current["timestamp_utc"],
             }
         except Exception:
-            replay = _historical_replay(city, "pm2_5", 24, "en")
             return {
                 "city_id": city.city_id,
                 "city_name": city.name,
                 "state": city.state,
-                "current": replay["current"]["value"],
-                "peak_24h": replay["forecast"]["peak"]["value"],
-                "category": replay["forecast"]["peak"]["category"],
-                "priority": replay["intelligence"]["priority"],
-                "mode": "historical_replay",
-                "timestamp_utc": replay["forecast"]["issue_timestamp"],
+                "current": None,
+                "peak_24h": None,
+                "category": None,
+                "priority": "Unavailable",
+                "mode": "live_numerical_outlook",
+                "timestamp_utc": None,
             }
 
     cities = await asyncio.gather(*(one(city) for city in CITIES.values()))
@@ -1279,5 +1268,5 @@ async def build_network_overview(mode: str = "live") -> dict[str, Any]:
         "pollutant": "pm2_5",
         "unit": "µg/m³",
         "cities": cities,
-        "methodology": "Compact city-scale 24-hour numerical outlook with validated replay fallback",
+        "methodology": "Fixed 24-hour live CAMS numerical outlook; unavailable cities are not substituted.",
     }

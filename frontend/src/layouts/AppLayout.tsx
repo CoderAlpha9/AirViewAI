@@ -19,7 +19,7 @@ export function AppLayout() {
             </div>
           </div>
           <div className="hidden items-center gap-3 sm:flex">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,.7)]" />
+            <span className="h-2 w-2 rounded-full bg-emerald-400" />
             <span className="text-xs text-slate-400">Operational dashboard</span>
           </div>
         </div>

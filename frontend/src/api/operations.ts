@@ -4,7 +4,6 @@ import { apiClient } from "./client";
 
 export type Pollutant = "pm2_5" | "pm10";
 export type Language = "en" | "hi" | "pa";
-export type DashboardMode = "live" | "demo";
 
 export interface CityConfig {
   city_id: string;
@@ -120,12 +119,12 @@ export interface NetworkCitySummary {
   city_id: string;
   city_name: string;
   state: string;
-  current: number;
-  peak_24h: number;
+  current: number | null;
+  peak_24h: number | null;
   category: string | null;
   priority: string;
-  mode: "live_numerical_outlook" | "historical_replay";
-  timestamp_utc: string;
+  mode: "live_numerical_outlook";
+  timestamp_utc: string | null;
 }
 
 export interface NetworkOverview {
@@ -137,7 +136,7 @@ export interface NetworkOverview {
 }
 
 export interface OperationsDashboard {
-  mode: "operational_forecast" | "historical_replay";
+  mode: "operational_forecast";
   live: boolean;
   generated_at_utc: string;
   city: CityConfig;
@@ -194,7 +193,6 @@ export async function getOperationsDashboard(
     pollutant: Pollutant;
     horizon: 24 | 48 | 72;
     language: Language;
-    mode: DashboardMode;
   },
   signal?: AbortSignal,
 ): Promise<OperationsDashboard> {
@@ -206,7 +204,6 @@ export async function getOperationsDashboard(
         pollutant: params.pollutant,
         horizon: params.horizon,
         language: params.language,
-        mode: params.mode,
       },
       signal,
     },
@@ -215,13 +212,9 @@ export async function getOperationsDashboard(
 }
 
 export async function getNetworkOverview(
-  mode: DashboardMode,
   signal?: AbortSignal,
 ): Promise<NetworkOverview> {
-  const response = await apiClient.get<NetworkOverview>("/operations/network", {
-    params: { mode },
-    signal,
-  });
+  const response = await apiClient.get<NetworkOverview>("/operations/network", { signal });
   return response.data;
 }
 
@@ -232,7 +225,7 @@ export function operationsError(error: unknown): string {
     return "The AirView service is not reachable. Check that the demo service is running, then retry.";
   }
   if (axiosError.response.status === 504) {
-    return "Live data providers are taking longer than expected. Retry now or switch to validated replay.";
+    return "Live data providers are taking longer than expected. Retry shortly.";
   }
   return (
     axiosError.response.data?.detail ??

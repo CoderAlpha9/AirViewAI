@@ -13,7 +13,6 @@ import {
   getNetworkOverview,
   operationsError,
   type CityConfig,
-  type DashboardMode,
   type Language,
   type NetworkOverview,
   type OperationsDashboard,
@@ -70,7 +69,6 @@ export function OperationsDashboardPage() {
   const [pollutant, setPollutant] = useState<Pollutant>("pm2_5");
   const [horizon, setHorizon] = useState<24 | 48 | 72>(72);
   const [language, setLanguage] = useState<Language>("en");
-  const [mode, setMode] = useState<DashboardMode>("live");
   const [dashboard, setDashboard] = useState<OperationsDashboard>();
   const [network, setNetwork] = useState<NetworkOverview>();
   const [loading, setLoading] = useState(true);
@@ -89,18 +87,18 @@ export function OperationsDashboardPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void getNetworkOverview(mode, controller.signal)
+    void getNetworkOverview(controller.signal)
       .then(setNetwork)
       .catch(() => undefined);
     return () => controller.abort();
-  }, [mode, refreshKey]);
+  }, [refreshKey]);
 
   const loadDashboard = useCallback(
     (signal: AbortSignal) => {
       setLoading(true);
       setError("");
       return getOperationsDashboard(
-        { cityId, pollutant, horizon, language, mode },
+        { cityId, pollutant, horizon, language },
         signal,
       )
         .then(setDashboard)
@@ -111,7 +109,7 @@ export function OperationsDashboardPage() {
           if (!signal.aborted) setLoading(false);
         });
     },
-    [cityId, horizon, language, mode, pollutant],
+    [cityId, horizon, language, pollutant],
   );
 
   useEffect(() => {
@@ -129,7 +127,6 @@ export function OperationsDashboardPage() {
         .slice(0, 5) ?? [],
     [dashboard],
   );
-  const liveFallback = mode === "live" && dashboard && !dashboard.live;
 
   return (
     <div className="mx-auto w-full max-w-[1560px] px-4 pb-12 pt-5 sm:px-6 lg:px-8">
@@ -140,9 +137,9 @@ export function OperationsDashboardPage() {
               Urban air operations
             </p>
             <span
-              className={`status-chip ${dashboard?.live ? "status-live" : "status-replay"}`}
+              className="status-chip status-live"
             >
-              {dashboard?.live ? "Live forecast" : "Validated replay"}
+              Live operational data
             </span>
           </div>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
@@ -207,20 +204,6 @@ export function OperationsDashboardPage() {
             <option value="pa">ਪੰਜਾਬੀ</option>
           </select>
         </label>
-        <div className="mode-switch" role="group" aria-label="Data mode">
-          <button
-            className={mode === "live" ? "active" : ""}
-            onClick={() => setMode("live")}
-          >
-            Live
-          </button>
-          <button
-            className={mode === "demo" ? "active" : ""}
-            onClick={() => setMode("demo")}
-          >
-            Replay
-          </button>
-        </div>
         <button
           className="refresh-button"
           onClick={() => setRefreshKey((value) => value + 1)}
@@ -231,18 +214,6 @@ export function OperationsDashboardPage() {
         </button>
       </div>
 
-      {liveFallback && (
-        <div className="mb-5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-          <strong>Live providers are temporarily unavailable.</strong> AirView
-          automatically switched to a validated historical replay so the
-          operational workflow remains demonstrable.
-        </div>
-      )}
-      {dashboard?.coverage_note && (
-        <div className="mb-5 rounded-lg border border-sky-500/35 bg-sky-500/10 px-4 py-3 text-sm leading-6 text-sky-100">
-          <strong>Regional replay note.</strong> {dashboard.coverage_note}
-        </div>
-      )}
       {error && (
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
           <span>{error}</span>
@@ -420,8 +391,7 @@ export function OperationsDashboardPage() {
                       ))
                     ) : (
                       <p className="text-sm text-slate-400">
-                        No evidence-supported action is available for this
-                        replay.
+                        No evidence-supported action is available right now.
                       </p>
                     )}
                   </div>
@@ -456,9 +426,7 @@ export function OperationsDashboardPage() {
                     <div className="stat-cell">
                       <dt>Forecast source</dt>
                       <dd>
-                        {dashboard.live
-                          ? "Live numerical feeds"
-                          : "Validated replay"}
+                        Live numerical feeds
                       </dd>
                     </div>
                   </dl>
@@ -563,10 +531,10 @@ export function OperationsDashboardPage() {
                         </span>
                       </td>
                       <td className="px-3 py-3 text-slate-300">
-                        {item.current.toFixed(1)} µg/m³
+                        {item.current != null ? `${item.current.toFixed(1)} µg/m³` : "Unavailable"}
                       </td>
                       <td className="px-3 py-3 text-slate-300">
-                        {item.peak_24h.toFixed(1)} µg/m³
+                        {item.peak_24h != null ? `${item.peak_24h.toFixed(1)} µg/m³` : "Unavailable"}
                       </td>
                       <td className="px-3 py-3">
                         <span
@@ -579,11 +547,7 @@ export function OperationsDashboardPage() {
                       <td className="px-3 py-3 text-slate-300">
                         {item.priority}
                       </td>
-                      <td className="px-3 py-3 text-xs text-slate-500">
-                        {item.mode === "live_numerical_outlook"
-                          ? "Live numerical"
-                          : "Replay fallback"}
-                      </td>
+                      <td className="px-3 py-3 text-xs text-slate-500">Live numerical</td>
                     </tr>
                   ))}
                 </tbody>

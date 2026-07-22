@@ -102,7 +102,6 @@ async def test_live_dashboard_returns_future_forecast(
             "pollutant": "pm2_5",
             "horizon": 72,
             "language": "en",
-            "mode": "live",
         },
     )
 
@@ -116,7 +115,7 @@ async def test_live_dashboard_returns_future_forecast(
     assert payload["current"]["value_kind"] == "observed"
 
 
-async def test_live_failure_falls_back_to_labelled_replay(
+async def test_live_failure_is_explicit_and_never_uses_historical_data(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     async def unavailable(*_: Any, **__: Any) -> dict[str, Any]:
@@ -129,14 +128,11 @@ async def test_live_failure_falls_back_to_labelled_replay(
 
     response = await client.get(
         "/api/operations/dashboard",
-        params={"city_id": "agra", "pollutant": "pm10", "horizon": 24, "mode": "live"},
+        params={"city_id": "agra", "pollutant": "pm10", "horizon": 24},
     )
 
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["mode"] == "historical_replay"
-    assert payload["live"] is False
-    assert "not a current operational forecast" in payload["disclaimer"]
+    assert response.status_code == 503
+    assert "temporarily unavailable" in response.json()["detail"]
 
 
 async def test_live_ludhiana_uses_pau_station(client: AsyncClient) -> None:
@@ -155,27 +151,26 @@ async def test_invalid_horizon_is_explicit(client: AsyncClient) -> None:
     assert response.status_code == 422
 
 
-async def test_ludhiana_replay_discloses_regional_station(client: AsyncClient) -> None:
-    response = await client.get(
-        "/api/operations/dashboard",
-        params={"city_id": "ludhiana", "pollutant": "pm2_5", "horizon": 24, "mode": "demo"},
-    )
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["city"]["station_id"] == "openaq-5542"
-    assert "Jalandhar" in payload["city"]["station_name"]
-    assert "Live mode targets PAU" in payload["coverage_note"]
-    assert payload["map"]["station"]["latitude"] == pytest.approx(31.321907)
-
-
 async def test_live_ludhiana_does_not_reuse_jalandhar_osm() -> None:
     city = operational.CITIES["ludhiana"]
     assert operational._osm_row(city) is None
 
 
-async def test_network_demo_returns_all_pilot_cities(client: AsyncClient) -> None:
-    response = await client.get("/api/operations/network", params={"mode": "demo"})
+async def test_panel_endpoint_returns_only_requested_operational_panel(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    now = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+
+    async def air(*_: Any, **__: Any) -> dict[str, Any]: return _air_payload(now)
+    async def weather(*_: Any, **__: Any) -> dict[str, Any]: return _weather_payload(now)
+    async def openaq(*_: Any, **__: Any) -> dict[str, Any]: return _openaq_payload(now)
+    async def firms(*_: Any, **__: Any) -> list[dict[str, Any]]: return []
+    monkeypatch.setattr(operational, "open_meteo_air_quality", air)
+    monkeypatch.setattr(operational, "open_meteo_weather", weather)
+    monkeypatch.setattr(operational, "openaq_recent", openaq)
+    monkeypatch.setattr(operational, "firms_near_real_time", firms)
+    response = await client.get("/api/operations/forecast-panel")
     assert response.status_code == 200
     payload = response.json()
-    assert {item["city_id"] for item in payload["cities"]} == set(operational.CITIES)
-    assert all(item["mode"] == "historical_replay" for item in payload["cities"])
+    assert payload["context"]["horizon"] == 72
+    assert len(payload["data"]["points"]) == 72
