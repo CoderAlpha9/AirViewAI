@@ -1,0 +1,154 @@
+{
+  "schema_version": "1.1",
+  "run_id": "be1916e0-931e-4b7f-ab80-03dde9a04092",
+  "created_at_utc": "2026-07-21T15:20:39.313091+00:00",
+  "request": {
+    "city_id": "delhi-ncr",
+    "pollutant": "pm2_5",
+    "horizon": 24,
+    "language": "en",
+    "audience": "general_public",
+    "format": "standard",
+    "scenario_strength": "reported"
+  },
+  "mode": "historical_replay",
+  "city_id": "delhi-ncr",
+  "station_id": "openaq-235",
+  "issue_timestamp": "2025-10-20 20:00:00+00:00",
+  "pollutant": "pm2_5",
+  "horizon": 24,
+  "priority": {
+    "city_id": "delhi-ncr",
+    "station_id": "openaq-235",
+    "timestamp_utc": "2025-10-20 20:00:00+00:00",
+    "pollutant": "pm2_5",
+    "severity": 1,
+    "source_category": "secondary_formation_and_meteorological_accumulation",
+    "confidence": 0.75,
+    "priority_score": 0.74,
+    "priority_tier": "High",
+    "recommended_inspection": "authorised official review; verify local conditions before action",
+    "limitations": [
+      "station-centred source-risk screening, not a measured hotspot surface"
+    ]
+  },
+  "agents": [
+    {
+      "agent_name": "data_readiness",
+      "version": "1.0",
+      "status": "completed",
+      "duration_ms": 0,
+      "evidence_references": [
+        "intelligence_input_audit.json"
+      ],
+      "warnings": [],
+      "skipped_reason": null
+    },
+    {
+      "agent_name": "forecast",
+      "version": "1.0",
+      "status": "completed",
+      "duration_ms": 0,
+      "evidence_references": [
+        "forecast_champion_matrix.json"
+      ],
+      "warnings": [
+        "historical replay only"
+      ],
+      "skipped_reason": null
+    },
+    {
+      "agent_name": "source_intelligence",
+      "version": "1.0",
+      "status": "completed",
+      "duration_ms": 0,
+      "evidence_references": [
+        "source_attribution_coverage.json"
+      ],
+      "warnings": [],
+      "skipped_reason": null
+    },
+    {
+      "agent_name": "hotspot_exposure",
+      "version": "1.0",
+      "status": "completed",
+      "duration_ms": 0,
+      "evidence_references": [
+        "hotspot_intelligence_report.json"
+      ],
+      "warnings": [],
+      "skipped_reason": null
+    },
+    {
+      "agent_name": "enforcement",
+      "version": "1.0",
+      "status": "completed",
+      "duration_ms": 0,
+      "evidence_references": [
+        "enforcement_priority_report.json"
+      ],
+      "warnings": [],
+      "skipped_reason": null
+    },
+    {
+      "agent_name": "intervention",
+      "version": "1.0",
+      "status": "completed",
+      "duration_ms": 0,
+      "evidence_references": [
+        "intervention_scenario_report.json"
+      ],
+      "warnings": [],
+      "skipped_reason": null
+    },
+    {
+      "agent_name": "citizen_advisory",
+      "version": "1.0",
+      "status": "completed",
+      "duration_ms": 0,
+      "evidence_references": [
+        "template-v1"
+      ],
+      "warnings": [
+        "historical replay only"
+      ],
+      "skipped_reason": null
+    },
+    {
+      "agent_name": "audit_safety",
+      "version": "1.0",
+      "status": "completed",
+      "duration_ms": 0,
+      "evidence_references": [
+        "historical-replay-policy"
+      ],
+      "warnings": [],
+      "skipped_reason": null
+    }
+  ],
+  "advisory": {
+    "language": "en",
+    "audience": "general_public",
+    "format": "standard",
+    "scenario_strength": "reported"
+  },
+  "advisory_template_version": "1.0",
+  "evidence_references": [
+    "intelligence_input_audit.json",
+    "forecast_champion_matrix.json",
+    "source_attribution_coverage.json",
+    "hotspot_intelligence_report.json",
+    "enforcement_priority_report.json",
+    "intervention_scenario_report.json",
+    "template-v1",
+    "historical-replay-policy"
+  ],
+  "limitations": [
+    "Not a live operational forecast",
+    "Source influence is screening, not regulatory apportionment",
+    "Scenario estimates are non-causal"
+  ],
+  "safety_result": "passed_replay_safety",
+  "overall_status": "completed",
+  "duration_ms": 0.8
+}

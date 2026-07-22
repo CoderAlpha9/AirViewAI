@@ -1,0 +1,37 @@
+# Environment and secrets
+.env
+.env.local
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+*.egg-info/
+
+# JavaScript
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# Local data and model artifacts
+data/raw/*
+data/interim/*
+data/processed/*
+ml/artifacts/*
+outputs/figures/*
+outputs/metrics/*
+outputs/reports/*
+!**/.gitkeep
+
+# Local persistence and OS/editor files
+*.db
+*.sqlite
+*.sqlite3
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

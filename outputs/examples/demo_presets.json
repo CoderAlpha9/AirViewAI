@@ -1,0 +1,142 @@
+[
+  {
+    "preset_id": "agra-curated-pm25-24",
+    "label": "Agra curated historical PM2.5 replay",
+    "city_id": "agra",
+    "city_name": "Agra",
+    "station_id": "openaq-860",
+    "station_name": "openaq-860",
+    "pollutant": "pm2_5",
+    "issue_timestamp": "2026-03-02 18:00:00+00:00",
+    "horizon": 24,
+    "language": "en",
+    "audience": "general_public",
+    "format": "standard",
+    "scenario_strength": "reported",
+    "case_type": "curated_historical_replay",
+    "mode": "historical_replay",
+    "evidence": {
+      "firms": true,
+      "osm": false,
+      "ghsl": false,
+      "sentinel5p": false
+    },
+    "provenance": [
+      "station_hourly_features.parquet",
+      "enforcement_priority_report.json",
+      "forecast replay artifacts"
+    ]
+  },
+  {
+    "preset_id": "amritsar-curated-pm25-24",
+    "label": "Amritsar curated historical PM2.5 replay",
+    "city_id": "amritsar",
+    "city_name": "Amritsar",
+    "station_id": "openaq-5551",
+    "station_name": "openaq-5551",
+    "pollutant": "pm2_5",
+    "issue_timestamp": "2026-03-02 18:00:00+00:00",
+    "horizon": 24,
+    "language": "hi",
+    "audience": "general_public",
+    "format": "standard",
+    "scenario_strength": "reported",
+    "case_type": "curated_historical_replay",
+    "mode": "historical_replay",
+    "evidence": {
+      "firms": true,
+      "osm": false,
+      "ghsl": false,
+      "sentinel5p": false
+    },
+    "provenance": [
+      "station_hourly_features.parquet",
+      "enforcement_priority_report.json",
+      "forecast replay artifacts"
+    ]
+  },
+  {
+    "preset_id": "delhi-ncr-curated-pm25-24",
+    "label": "Delhi NCR curated historical PM2.5 replay",
+    "city_id": "delhi-ncr",
+    "city_name": "Delhi NCR",
+    "station_id": "openaq-235",
+    "station_name": "openaq-235",
+    "pollutant": "pm2_5",
+    "issue_timestamp": "2026-03-02 18:00:00+00:00",
+    "horizon": 24,
+    "language": "en",
+    "audience": "general_public",
+    "format": "standard",
+    "scenario_strength": "reported",
+    "case_type": "curated_historical_replay",
+    "mode": "historical_replay",
+    "evidence": {
+      "firms": true,
+      "osm": true,
+      "ghsl": false,
+      "sentinel5p": false
+    },
+    "provenance": [
+      "station_hourly_features.parquet",
+      "enforcement_priority_report.json",
+      "forecast replay artifacts"
+    ]
+  },
+  {
+    "preset_id": "lucknow-curated-pm25-24",
+    "label": "Lucknow curated historical PM2.5 replay",
+    "city_id": "lucknow",
+    "city_name": "Lucknow",
+    "station_id": "openaq-2456",
+    "station_name": "openaq-2456",
+    "pollutant": "pm2_5",
+    "issue_timestamp": "2026-03-02 18:00:00+00:00",
+    "horizon": 24,
+    "language": "en",
+    "audience": "general_public",
+    "format": "standard",
+    "scenario_strength": "reported",
+    "case_type": "curated_historical_replay",
+    "mode": "historical_replay",
+    "evidence": {
+      "firms": true,
+      "osm": true,
+      "ghsl": false,
+      "sentinel5p": false
+    },
+    "provenance": [
+      "station_hourly_features.parquet",
+      "enforcement_priority_report.json",
+      "forecast replay artifacts"
+    ]
+  },
+  {
+    "preset_id": "ludhiana-curated-pm25-24",
+    "label": "Ludhiana curated historical PM2.5 replay",
+    "city_id": "ludhiana",
+    "city_name": "Ludhiana",
+    "station_id": "openaq-5542",
+    "station_name": "openaq-5542",
+    "pollutant": "pm2_5",
+    "issue_timestamp": "2026-03-01 15:00:00+00:00",
+    "horizon": 24,
+    "language": "pa",
+    "audience": "general_public",
+    "format": "standard",
+    "scenario_strength": "reported",
+    "case_type": "curated_historical_replay",
+    "mode": "historical_replay",
+    "evidence": {
+      "firms": true,
+      "osm": true,
+      "ghsl": false,
+      "sentinel5p": false
+    },
+    "provenance": [
+      "station_hourly_features.parquet",
+      "enforcement_priority_report.json",
+      "forecast replay artifacts"
+    ]
+  }
+]

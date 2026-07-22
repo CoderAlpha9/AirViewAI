@@ -1,0 +1,443 @@
+{
+  "city_id": "lucknow",
+  "pollutant": "pm10",
+  "horizon": 72,
+  "issue_time": "2026-02-01 00:00:00+00:00",
+  "mode": "historical_replay",
+  "freshness": "stale_historical",
+  "points": [
+    {
+      "timestamp_utc": "2026-02-28 15:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 87.475
+    },
+    {
+      "timestamp_utc": "2026-02-28 16:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 120.35
+    },
+    {
+      "timestamp_utc": "2026-02-28 17:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 210.10000000000002
+    },
+    {
+      "timestamp_utc": "2026-02-28 18:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 240.1
+    },
+    {
+      "timestamp_utc": "2026-02-28 19:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": null
+    },
+    {
+      "timestamp_utc": "2026-02-28 20:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 195.0
+    },
+    {
+      "timestamp_utc": "2026-02-28 21:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 126.1
+    },
+    {
+      "timestamp_utc": "2026-02-28 22:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 103.42500000000001
+    },
+    {
+      "timestamp_utc": "2026-02-28 23:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 103.75
+    },
+    {
+      "timestamp_utc": "2026-03-01 00:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 97.55
+    },
+    {
+      "timestamp_utc": "2026-03-01 01:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 83.325
+    },
+    {
+      "timestamp_utc": "2026-03-01 02:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 105.275
+    },
+    {
+      "timestamp_utc": "2026-03-01 03:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 130.175
+    },
+    {
+      "timestamp_utc": "2026-03-01 04:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 132.1
+    },
+    {
+      "timestamp_utc": "2026-03-01 05:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 140.8
+    },
+    {
+      "timestamp_utc": "2026-03-01 06:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 128.8
+    },
+    {
+      "timestamp_utc": "2026-03-01 07:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 116.0
+    },
+    {
+      "timestamp_utc": "2026-03-01 08:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 109.325
+    },
+    {
+      "timestamp_utc": "2026-03-01 09:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 116.9
+    },
+    {
+      "timestamp_utc": "2026-03-01 10:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 114.64999999999999
+    },
+    {
+      "timestamp_utc": "2026-03-01 11:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 115.7
+    },
+    {
+      "timestamp_utc": "2026-03-01 12:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 126.2
+    },
+    {
+      "timestamp_utc": "2026-03-01 13:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 130.5
+    },
+    {
+      "timestamp_utc": "2026-03-01 14:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 129.325
+    },
+    {
+      "timestamp_utc": "2026-03-01 15:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 97.22500000000001
+    },
+    {
+      "timestamp_utc": "2026-03-01 16:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 92.89999999999999
+    },
+    {
+      "timestamp_utc": "2026-03-01 17:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 94.4
+    },
+    {
+      "timestamp_utc": "2026-03-01 18:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 94.2
+    },
+    {
+      "timestamp_utc": "2026-03-01 19:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": null
+    },
+    {
+      "timestamp_utc": "2026-03-01 20:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 84.06666666666668
+    },
+    {
+      "timestamp_utc": "2026-03-01 21:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 87.15
+    },
+    {
+      "timestamp_utc": "2026-03-01 22:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 86.4
+    },
+    {
+      "timestamp_utc": "2026-03-01 23:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 83.625
+    },
+    {
+      "timestamp_utc": "2026-03-02 00:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 77.725
+    },
+    {
+      "timestamp_utc": "2026-03-02 01:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 83.8
+    },
+    {
+      "timestamp_utc": "2026-03-02 02:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 94.07499999999999
+    },
+    {
+      "timestamp_utc": "2026-03-02 03:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 94.725
+    },
+    {
+      "timestamp_utc": "2026-03-02 04:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 118.8
+    },
+    {
+      "timestamp_utc": "2026-03-02 05:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 131.525
+    },
+    {
+      "timestamp_utc": "2026-03-02 06:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 132.0
+    },
+    {
+      "timestamp_utc": "2026-03-02 07:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 55.300000000000004
+    },
+    {
+      "timestamp_utc": "2026-03-02 08:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 214.475
+    },
+    {
+      "timestamp_utc": "2026-03-02 09:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 0.0
+    },
+    {
+      "timestamp_utc": "2026-03-02 10:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 60.9
+    },
+    {
+      "timestamp_utc": "2026-03-02 11:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": null
+    },
+    {
+      "timestamp_utc": "2026-03-02 12:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 125.33333333333333
+    },
+    {
+      "timestamp_utc": "2026-03-02 13:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 86.9
+    },
+    {
+      "timestamp_utc": "2026-03-02 14:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 127.8
+    },
+    {
+      "timestamp_utc": "2026-03-02 15:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": null
+    },
+    {
+      "timestamp_utc": "2026-03-02 16:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 98.9
+    },
+    {
+      "timestamp_utc": "2026-03-02 17:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 90.2
+    },
+    {
+      "timestamp_utc": "2026-03-02 18:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 100.23333333333333
+    },
+    {
+      "timestamp_utc": "2026-03-02 19:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 108.475
+    },
+    {
+      "timestamp_utc": "2026-03-02 20:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 115.35
+    },
+    {
+      "timestamp_utc": "2026-03-02 21:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 130.4
+    },
+    {
+      "timestamp_utc": "2026-03-02 22:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 132.9
+    },
+    {
+      "timestamp_utc": "2026-03-02 23:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 109.775
+    },
+    {
+      "timestamp_utc": "2026-03-03 00:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 104.475
+    },
+    {
+      "timestamp_utc": "2026-03-03 01:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 109.43333333333334
+    },
+    {
+      "timestamp_utc": "2026-03-03 02:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 135.25
+    },
+    {
+      "timestamp_utc": "2026-03-03 03:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 158.575
+    },
+    {
+      "timestamp_utc": "2026-03-03 04:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 164.33333333333334
+    },
+    {
+      "timestamp_utc": "2026-03-03 05:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 162.53333333333333
+    },
+    {
+      "timestamp_utc": "2026-03-03 06:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 148.83333333333334
+    },
+    {
+      "timestamp_utc": "2026-03-03 07:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 136.85
+    },
+    {
+      "timestamp_utc": "2026-03-03 08:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 129.73333333333335
+    },
+    {
+      "timestamp_utc": "2026-03-03 09:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 125.15
+    },
+    {
+      "timestamp_utc": "2026-03-03 10:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 124.725
+    },
+    {
+      "timestamp_utc": "2026-03-03 11:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 121.2
+    },
+    {
+      "timestamp_utc": "2026-03-03 12:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 118.55
+    },
+    {
+      "timestamp_utc": "2026-03-03 13:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 113.7
+    },
+    {
+      "timestamp_utc": "2026-03-03 14:00:00+00:00",
+      "prediction": 134.6,
+      "baseline": 134.6,
+      "actual": 103.9
+    }
+  ],
+  "warning": "Not current/live."
+}
